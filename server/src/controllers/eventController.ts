@@ -27,8 +27,9 @@ export async function getEvents(req: Request, res: Response, next: NextFunction)
 export async function ingestZeek(req: Request, res: Response, next: NextFunction) {
   try {
     // 1. If file uploaded via Multer
-    if (req.file) {
-      const content = req.file.buffer.toString('utf8');
+    const file = req.file || (Array.isArray(req.files) && req.files.length > 0 ? (req.files[0] as Express.Multer.File) : undefined);
+    if (file) {
+      const content = file.buffer.toString('utf8');
       const result = await ingestionService.ingestZeekContent(content);
       return sendSuccess(res, result, 201);
     }

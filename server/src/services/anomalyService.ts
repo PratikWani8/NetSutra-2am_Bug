@@ -128,46 +128,12 @@ export class AnomalyService {
 
       return investigationResult;
     } catch (err: any) {
-      logger.warn(`AI Provider investigation failed: ${err.message}. Generating grounded baseline analysis.`);
+      logger.warn(`AI Provider investigation failed for ${provider}: ${err.message}`);
       socketService.emitAiStatus(provider, 'error', {
         anomaly_id: anomaly.anomaly_id,
         error: err.message
       });
-
-      // Provide grounded forensic assessment based on measured telemetry so user is never blocked
-      const srcHost = anomaly.source_ip || formattedEvidence[0]?.source_ip || 'Source host';
-      const dstHost = anomaly.destination_ip || formattedEvidence[0]?.destination_ip || 'Target host';
-      const dstPort = anomaly.destination_port || formattedEvidence[0]?.destination_port;
-      const bytes = anomaly.features?.outbound_bytes || formattedEvidence[0]?.outbound_bytes;
-      const mbStr = bytes ? `${(bytes / 1000000).toFixed(1)} MB` : null;
-
-      return {
-        incident_id: incidentContext.incident_id,
-        provider: provider,
-        model: 'grounded-baseline-engine',
-        summary: `Grounded statistical baseline deviation assessment for ${anomaly.method}: Outbound traffic (${mbStr ? `${mbStr} outbound` : 'anomalous volume'}) from ${srcHost} to ${dstHost}${dstPort ? `:${dstPort}` : ''} exceeded behavioral baseline threshold.`,
-        observed_evidence: [
-          `Outbound connection metrics deviated significantly from historical baseline parameters.`,
-          `Observed connection state: ${formattedEvidence[0]?.conn_state || 'SF'}.`,
-          `Anomaly confidence score: ${anomaly.score} (${anomaly.severity} severity).`,
-          `Behavioral detector method: ${anomaly.method}.`
-        ],
-        possible_explanations: [
-          `High-volume file transfer, bulk backup, or database synchronization from host ${srcHost}.`,
-          `Potential automated data exfiltration or staging by an unauthorized process.`,
-          `Routine scheduled software update or telemetry dump.`
-        ],
-        recommended_checks: [
-          `Cross-reference connection timestamp (${anomaly.timestamp}) with authentication and process creation logs on ${srcHost}.`,
-          `Verify destination IP ${dstHost} reputation and check if it is part of approved cloud infrastructure.`,
-          `Inspect firewall and egress filtering policies on destination port ${dstPort || 443}.`
-        ],
-        uncertainties: [
-          `Telemetry contains connection and volume metrics only; application layer content cannot be fully reconstructed from headers.`,
-          `Notice: Cloud AI provider returned an error (${err.message}). Set a valid GEMMA_API_KEY from Google AI Studio in ai-service/.env for live LLM reasoning.`
-        ],
-        created_at: new Date().toISOString()
-      };
+      throw err;
     }
   }
 }

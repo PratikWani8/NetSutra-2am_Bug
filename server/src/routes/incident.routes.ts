@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getIncidents, getIncidentById, updateIncidentStatus } from '../controllers/incidentController';
+import { getIncidents, getIncidentById, updateIncidentStatus, explainIncident } from '../controllers/incidentController';
 import { validate } from '../middleware/validate';
 import { incidentQuerySchema, incidentIdParamSchema, incidentStatusUpdateSchema } from '../schemas/incident.schema';
 
@@ -11,4 +11,9 @@ incidentRouter.patch(
   '/incidents/:id/status',
   validate({ params: incidentIdParamSchema, body: incidentStatusUpdateSchema }),
   updateIncidentStatus
+);
+incidentRouter.post(
+  '/incidents/:id/explain',
+  validate({ params: incidentIdParamSchema }),
+  explainIncident
 );

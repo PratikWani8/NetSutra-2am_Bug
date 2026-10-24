@@ -11,7 +11,9 @@ import { logger } from '../utils/logger';
 
 export class AnomalyService {
   async listAnomalies(filter: AnomalyQueryFilter): Promise<PaginatedResult<Anomaly>> {
-    return anomalyRepository.find(filter);
+    const res = await anomalyRepository.find(filter);
+    await this.enrichAnomalies(res.items);
+    return res;
   }
 
   async getAnomalyById(id: string): Promise<Anomaly> {
@@ -19,10 +21,47 @@ export class AnomalyService {
     if (!anomaly) {
       throw new AppError(404, 'ANOMALY_NOT_FOUND', `Anomaly with ID '${id}' was not found.`);
     }
+    await this.enrichAnomalies([anomaly]);
     return anomaly;
   }
 
-  async investigateAnomaly(id: string): Promise<InvestigateResponse> {
+  private async enrichAnomalies(anomalies: Anomaly[]): Promise<void> {
+    if (!anomalies || anomalies.length === 0) return;
+    const missingAnoms = anomalies.filter(
+      a => !a.source_ip || !a.destination_ip || a.source_ip === 'N/A' || a.destination_ip === 'N/A'
+    );
+    if (missingAnoms.length === 0) return;
+
+    const allEventIds = Array.from(new Set(missingAnoms.flatMap(a => a.evidence_event_ids || [])));
+    const events = allEventIds.length > 0 ? await eventRepository.findManyByIds(allEventIds) : [];
+    const eventMap = new Map(events.map(e => [e.event_id, e]));
+
+    for (const anom of missingAnoms) {
+      let matchedEvt: any = null;
+      if (anom.evidence_event_ids && anom.evidence_event_ids.length > 0) {
+        for (const evtId of anom.evidence_event_ids) {
+          if (eventMap.has(evtId)) {
+            matchedEvt = eventMap.get(evtId);
+            break;
+          }
+        }
+      }
+
+      if (matchedEvt) {
+        anom.source_ip = anom.source_ip || matchedEvt.source_ip;
+        anom.destination_ip = anom.destination_ip || matchedEvt.destination_ip;
+        anom.source_port = anom.source_port ?? matchedEvt.source_port;
+        anom.destination_port = anom.destination_port ?? matchedEvt.destination_port;
+        if (!anom.features) anom.features = {};
+        anom.features.source_ip = anom.features.source_ip || matchedEvt.source_ip;
+        anom.features.destination_ip = anom.features.destination_ip || matchedEvt.destination_ip;
+        anom.features.source_port = anom.features.source_port ?? matchedEvt.source_port;
+        anom.features.destination_port = anom.features.destination_port ?? matchedEvt.destination_port;
+      }
+    }
+  }
+
+  async investigateAnomaly(id: string, requestedProvider?: any): Promise<InvestigateResponse> {
     const anomaly = await this.getAnomalyById(id);
 
     // 1. Retrieve supporting evidence events
@@ -60,8 +99,8 @@ export class AnomalyService {
       });
     }
 
-    // 2. Retrieve the currently selected AI provider
-    const provider = await settingsRepository.getSelectedProvider();
+    // 2. Retrieve the currently selected AI provider or user-requested override
+    const provider = requestedProvider || (await settingsRepository.getSelectedProvider()) || 'gemma-api';
 
     // 3. Construct the incident payload
     const incidentContext = {

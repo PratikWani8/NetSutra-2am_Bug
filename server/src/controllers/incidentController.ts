@@ -41,3 +41,13 @@ export async function updateIncidentStatus(req: Request, res: Response, next: Ne
     next(error);
   }
 }
+
+export async function explainIncident(req: Request, res: Response, next: NextFunction) {
+  try {
+    const requestedProvider = req.body?.provider;
+    const explanation = await incidentService.explainIncident(req.params.id, requestedProvider);
+    return sendSuccess(res, explanation);
+  } catch (error) {
+    next(error);
+  }
+}

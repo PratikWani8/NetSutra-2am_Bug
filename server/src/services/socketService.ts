@@ -32,6 +32,7 @@ export class SocketService {
   emitNetworkEvent(event: NetworkEvent): void {
     if (!this.io) return;
     this.io.emit('network:event', {
+      ...event,
       id: event.event_id,
       timestamp: event.timestamp,
       event
@@ -41,6 +42,7 @@ export class SocketService {
   emitAnomalyDetected(anomaly: Anomaly): void {
     if (!this.io) return;
     this.io.emit('anomaly:detected', {
+      ...anomaly,
       id: anomaly.anomaly_id,
       timestamp: anomaly.timestamp,
       anomaly
@@ -50,6 +52,7 @@ export class SocketService {
   emitIncidentUpdated(incident: Incident): void {
     if (!this.io) return;
     this.io.emit('incident:updated', {
+      ...incident,
       id: incident.incident_id,
       timestamp: incident.updated_at,
       incident

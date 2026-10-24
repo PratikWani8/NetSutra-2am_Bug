@@ -13,6 +13,10 @@ export interface Anomaly {
   features: Record<string, any>;
   evidence_event_ids: string[];
   baseline_confidence: BaselineConfidence;
+  source_ip?: string;
+  destination_ip?: string;
+  source_port?: number | null;
+  destination_port?: number | null;
 }
 
 export interface DetectionParameters {

@@ -95,6 +95,24 @@ export class IngestionService {
         if (detectionResult?.anomalies?.length > 0) {
           detectedAnomalies = detectionResult.anomalies;
 
+          // Attach source and destination tuples from telemetry events
+          const eventMap = new Map(events.map(e => [e.event_id, e]));
+          for (const anomaly of detectedAnomalies) {
+            const firstEvtId = anomaly.evidence_event_ids?.[0];
+            const matchingEvt = firstEvtId ? eventMap.get(firstEvtId) : events[0];
+            if (matchingEvt) {
+              anomaly.source_ip = anomaly.source_ip || matchingEvt.source_ip;
+              anomaly.destination_ip = anomaly.destination_ip || matchingEvt.destination_ip;
+              anomaly.source_port = anomaly.source_port ?? matchingEvt.source_port;
+              anomaly.destination_port = anomaly.destination_port ?? matchingEvt.destination_port;
+              if (!anomaly.features) anomaly.features = {};
+              anomaly.features.source_ip = anomaly.features.source_ip || matchingEvt.source_ip;
+              anomaly.features.destination_ip = anomaly.features.destination_ip || matchingEvt.destination_ip;
+              anomaly.features.source_port = anomaly.features.source_port ?? matchingEvt.source_port;
+              anomaly.features.destination_port = anomaly.features.destination_port ?? matchingEvt.destination_port;
+            }
+          }
+
           // 4. Persist detected anomalies BEFORE broadcasting
           await anomalyRepository.saveBatch(detectedAnomalies);
           logger.info(`Persisted ${detectedAnomalies.length} detected anomalies.`);

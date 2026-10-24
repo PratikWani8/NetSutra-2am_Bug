@@ -64,6 +64,22 @@ class Anomaly(BaseModel):
         ...,
         description="Confidence of baseline data available for comparison"
     )
+    source_ip: Optional[str] = Field(
+        default=None,
+        description="Originating source IP associated with the anomaly"
+    )
+    destination_ip: Optional[str] = Field(
+        default=None,
+        description="Target destination IP associated with the anomaly"
+    )
+    source_port: Optional[int] = Field(
+        default=None,
+        description="Source port associated with the anomaly"
+    )
+    destination_port: Optional[int] = Field(
+        default=None,
+        description="Destination port associated with the anomaly"
+    )
 
 
 class DetectionParameters(BaseModel):

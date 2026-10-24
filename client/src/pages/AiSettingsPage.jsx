@@ -42,7 +42,29 @@ export const AiSettingsPage = () => {
     }
 
     if (statusRes.success) {
-      const list = statusRes.data?.providers || [];
+      const raw = statusRes.data?.providers || statusRes.data;
+      let list = [];
+      if (Array.isArray(raw)) {
+        list = raw.map((p) => ({
+          ...p,
+          id: p.id,
+          available: p.available !== undefined ? Boolean(p.available) : p.status === 'available',
+          status: p.status || (p.available ? 'available' : 'unavailable'),
+        }));
+      } else if (raw && typeof raw === 'object') {
+        list = Object.entries(raw).map(([id, info]) => {
+          const isAvail =
+            typeof info === 'object' && info !== null
+              ? (info.available !== undefined ? Boolean(info.available) : info.status === 'available')
+              : Boolean(info);
+          return {
+            id,
+            ...(typeof info === 'object' && info !== null ? info : {}),
+            available: isAvail,
+            status: isAvail ? 'available' : 'unavailable',
+          };
+        });
+      }
       setProvidersStatus(list);
     }
 
@@ -53,13 +75,31 @@ export const AiSettingsPage = () => {
     fetchProviderSettings();
   }, [fetchProviderSettings]);
 
+  const getStatusInfo = (providerId) => {
+    if (Array.isArray(providersStatus)) {
+      return providersStatus.find((p) => p.id === providerId) || null;
+    }
+    if (providersStatus && typeof providersStatus === 'object') {
+      const raw = providersStatus[providerId];
+      if (raw) {
+        return {
+          id: providerId,
+          ...raw,
+          available: raw.available !== undefined ? Boolean(raw.available) : raw.status === 'available',
+          status: raw.status || (raw.available ? 'available' : 'unavailable'),
+        };
+      }
+    }
+    return null;
+  };
+
   const handleSaveProvider = async () => {
     setIsSaving(true);
     setFeedbackMessage(null);
 
     // Check availability of chosen provider
-    const targetStatus = providersStatus.find((p) => p.id === selectedProvider);
-    if (targetStatus && targetStatus.status === 'unavailable') {
+    const targetStatus = getStatusInfo(selectedProvider);
+    if (targetStatus && (targetStatus.available === false || targetStatus.status === 'unavailable')) {
       setFeedbackMessage({
         type: 'error',
         text: `The selected AI provider (${selectedProvider}) is currently unavailable. As required, NetSutra does not switch automatically; you may proceed or select another provider.`,
@@ -166,8 +206,8 @@ export const AiSettingsPage = () => {
             const Icon = cfg.icon;
             const isSelected = selectedProvider === cfg.id;
             const isCurrent = currentProvider === cfg.id;
-            const statusInfo = providersStatus.find((p) => p.id === cfg.id);
-            const isAvailable = statusInfo ? statusInfo.status === 'available' : true;
+            const statusInfo = getStatusInfo(cfg.id);
+            const isAvailable = statusInfo ? Boolean(statusInfo.available ?? (statusInfo.status === 'available')) : true;
 
             return (
               <div

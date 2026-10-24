@@ -30,6 +30,10 @@ export const IncidentDetailPage = () => {
   const [isDemo, setIsDemo] = useState(false);
 
   const fetchIncident = useCallback(async () => {
+    if (!id || id === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     const res = await netSutraApi.getIncidentById(id);
     if (res.success) {
@@ -44,13 +48,15 @@ export const IncidentDetailPage = () => {
   }, [fetchIncident]);
 
   const handleStatusChange = async (newStatus) => {
+    const targetId = incident?.id || incident?.incident_id || id;
+    if (!targetId || targetId === 'undefined') return;
     setIsUpdatingStatus(true);
     setStatusMessage('');
 
-    const res = await netSutraApi.updateIncidentStatus(id, newStatus);
+    const res = await netSutraApi.updateIncidentStatus(targetId, newStatus);
     if (res.success) {
       setIncident((prev) => ({ ...prev, status: newStatus }));
-      setStatusMessage(`Status updated to "${newStatus}" successfully via PATCH /api/incidents/${id}/status`);
+      setStatusMessage(`Status updated to "${newStatus}" successfully via PATCH /api/incidents/${targetId}/status`);
     } else {
       setStatusMessage(`Failed to update status: ${res.error?.message}`);
     }
@@ -66,16 +72,71 @@ export const IncidentDetailPage = () => {
     );
   }
 
-  if (!incident) {
+  if (!id || id === 'undefined') {
     return (
       <div className="space-y-6">
         <Header title="Incident Dossier Inspection" />
-        <GlassCard className="p-8 text-center text-slate-500">
-          Incident record {id} could not be found.
+        <GlassCard className="p-8 text-center text-slate-500 space-y-4">
+          <AlertTriangle className="w-10 h-10 text-amber-500 mx-auto" />
+          <h2 className="text-base font-bold text-slate-800 dark:text-slate-200">
+            No Specific Incident Identifier Specified
+          </h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto">
+            The URL did not contain a valid incident record ID. Please select an incident from the security dossier center to review forensic tracking.
+          </p>
+          <div>
+            <Link
+              to="/incidents"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition shadow-sm cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Incidents Center</span>
+            </Link>
+          </div>
         </GlassCard>
       </div>
     );
   }
+
+  if (!incident) {
+    return (
+      <div className="space-y-6">
+        <Header title="Incident Dossier Inspection" />
+        <GlassCard className="p-8 text-center text-slate-500 space-y-4">
+          <AlertTriangle className="w-10 h-10 text-slate-400 mx-auto" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Incident record <span className="font-mono font-bold text-blue-600">{id}</span> could not be found.
+          </p>
+          <div>
+            <Link
+              to="/incidents"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition shadow-sm cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Incidents Center</span>
+            </Link>
+          </div>
+        </GlassCard>
+      </div>
+    );
+  }
+
+  const incId = incident.id || incident.incident_id || id;
+  const title = incident.title || 'Security Incident Dossier';
+  const firstObs = incident.firstObserved || incident.first_observed || incident.created_at;
+  const lastObs = incident.lastObserved || incident.last_observed || incident.updated_at;
+  const analyst = incident.assignedAnalyst || 'SecOps AI Agent';
+  const relatedAnomalies = incident.relatedAnomalies || incident.anomaly_ids || [];
+  const affectedHosts = incident.affectedHosts || (incident.primary_source_ip ? [incident.primary_source_ip] : []);
+  const evidenceTimeline =
+    incident.evidenceTimeline ||
+    (Array.isArray(incident.evidence)
+      ? incident.evidence.map((e) => ({
+          timestamp: formatUtcTime(e.timestamp || firstObs),
+          event: `${e.source_ip || 'Source'}:${e.source_port || ''} -> ${e.destination_ip || 'Dest'}:${e.destination_port || ''} (${e.protocol || 'TCP'}) [${e.conn_state || 'FLOW'}]`,
+          source: e.source_ip,
+        }))
+      : []);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -90,9 +151,9 @@ export const IncidentDetailPage = () => {
       </div>
 
       <Header
-        title={`Incident Dossier: ${incident.id}`}
+        title={`Incident Dossier: ${incId}`}
         badge={incident.severity}
-        subtitle={incident.title}
+        subtitle={title}
         isDemo={isDemo}
       />
 
@@ -110,10 +171,10 @@ export const IncidentDetailPage = () => {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    {incident.title}
+                    {title}
                   </h2>
                   <div className="text-xs font-mono text-slate-400">
-                    Lead Analyst: {incident.assignedAnalyst || 'Unassigned'}
+                    Lead Analyst: {analyst}
                   </div>
                 </div>
               </div>
@@ -165,7 +226,7 @@ export const IncidentDetailPage = () => {
                   FIRST OBSERVED (UTC)
                 </span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {formatFullUtc(incident.firstObserved)}
+                  {formatFullUtc(firstObs)}
                 </span>
               </div>
               <div>
@@ -173,7 +234,7 @@ export const IncidentDetailPage = () => {
                   LAST OBSERVED (UTC)
                 </span>
                 <span className="font-semibold text-slate-800 dark:text-slate-200">
-                  {formatFullUtc(incident.lastObserved)}
+                  {formatFullUtc(lastObs)}
                 </span>
               </div>
             </div>
@@ -191,22 +252,28 @@ export const IncidentDetailPage = () => {
           <GlassCard className="p-6 space-y-4">
             <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Clock className="w-4 h-4 text-blue-600" />
-              <span>Evidence Timeline & Event Milestones</span>
+              <span>Evidence Timeline & Event Milestones ({evidenceTimeline.length})</span>
             </h3>
 
-            <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
-              {(incident.evidenceTimeline || []).map((tl, idx) => (
-                <div key={idx} className="relative flex flex-col sm:flex-row sm:items-baseline gap-2">
-                  <span className="absolute -left-6 top-1.5 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white dark:border-slate-900" />
-                  <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400 shrink-0 sm:w-28">
-                    {tl.timestamp}
-                  </span>
-                  <span className="text-xs text-slate-700 dark:text-slate-300">
-                    {tl.event}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {evidenceTimeline.length === 0 ? (
+              <div className="text-xs text-slate-400 py-4 font-mono">
+                No chronological events recorded for this incident.
+              </div>
+            ) : (
+              <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
+                {evidenceTimeline.map((tl, idx) => (
+                  <div key={idx} className="relative flex flex-col sm:flex-row sm:items-baseline gap-2">
+                    <span className="absolute -left-6 top-1.5 w-2.5 h-2.5 rounded-full bg-blue-600 border-2 border-white dark:border-slate-900" />
+                    <span className="text-[11px] font-mono font-bold text-blue-600 dark:text-blue-400 shrink-0 sm:w-28">
+                      {tl.timestamp || 'Recorded'}
+                    </span>
+                    <span className="text-xs text-slate-700 dark:text-slate-300">
+                      {tl.event}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </GlassCard>
 
           {/* AI Investigation Findings */}
@@ -217,7 +284,7 @@ export const IncidentDetailPage = () => {
                 <span>AI Root-Cause Investigation Findings</span>
               </div>
               <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/60 dark:border-indigo-800/40 text-xs sm:text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-                {incident.aiFindings.assessment}
+                {incident.aiFindings.assessment || incident.aiFindings.summary || JSON.stringify(incident.aiFindings)}
               </div>
             </GlassCard>
           )}
@@ -229,20 +296,24 @@ export const IncidentDetailPage = () => {
           <GlassCard className="p-5 space-y-3">
             <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Activity className="w-4 h-4 text-blue-600" />
-              <span>Related Anomalies ({(incident.relatedAnomalies || []).length})</span>
+              <span>Related Anomalies ({relatedAnomalies.length})</span>
             </h3>
 
             <div className="space-y-2">
-              {(incident.relatedAnomalies || []).map((anomId) => (
-                <Link
-                  key={anomId}
-                  to={`/anomalies/${anomId}`}
-                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:border-blue-300 text-xs font-mono group"
-                >
-                  <div className="font-bold text-blue-600 dark:text-blue-400">{anomId}</div>
-                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
-                </Link>
-              ))}
+              {relatedAnomalies.length === 0 ? (
+                <div className="text-xs text-slate-400 p-2 font-mono">No linked anomalies recorded.</div>
+              ) : (
+                relatedAnomalies.map((anomId) => (
+                  <Link
+                    key={anomId}
+                    to={`/anomalies/${anomId}`}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 hover:border-blue-300 text-xs font-mono group"
+                  >
+                    <div className="font-bold text-blue-600 dark:text-blue-400">{anomId}</div>
+                    <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                  </Link>
+                ))
+              )}
             </div>
           </GlassCard>
 
@@ -250,19 +321,23 @@ export const IncidentDetailPage = () => {
           <GlassCard className="p-5 space-y-3">
             <h3 className="text-xs font-mono uppercase tracking-wider font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <Shield className="w-4 h-4 text-rose-600" />
-              <span>Affected Hosts ({(incident.affectedHosts || []).length})</span>
+              <span>Affected Hosts ({affectedHosts.length})</span>
             </h3>
 
             <div className="space-y-1.5 font-mono text-xs">
-              {(incident.affectedHosts || []).map((host) => (
-                <div
-                  key={host}
-                  className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between"
-                >
-                  <span className="font-bold text-slate-900 dark:text-white">{host}</span>
-                  <span className="text-[10px] text-slate-400">Endpoint</span>
-                </div>
-              ))}
+              {affectedHosts.length === 0 ? (
+                <div className="text-xs text-slate-400 p-2 font-mono">No affected hosts listed.</div>
+              ) : (
+                affectedHosts.map((host) => (
+                  <div
+                    key={host}
+                    className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between"
+                  >
+                    <span className="font-bold text-slate-900 dark:text-white">{host}</span>
+                    <span className="text-[10px] text-slate-400">Endpoint</span>
+                  </div>
+                ))
+              )}
             </div>
           </GlassCard>
         </div>

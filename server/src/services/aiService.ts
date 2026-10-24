@@ -163,11 +163,13 @@ export class AiService {
 
       // If provider is unavailable or returned 502/503 during investigation
       if (operation === 'investigation' || status === 502 || status === 503) {
-        logger.warn(`AI Provider failure for ${provider || 'selected provider'}: ${message}`);
+        const code = data?.error_type || (status === 503 ? 'PROVIDER_UNAVAILABLE' : 'PROVIDER_RESPONSE_ERROR');
+        logger.warn(`AI Provider failure for ${provider || 'selected provider'} [${code}]: ${message}`);
         throw new AppError(
           status === 503 ? 503 : 502,
-          'PROVIDER_UNAVAILABLE',
-          `The selected AI provider is unavailable: ${message}`
+          code,
+          message,
+          { provider: data?.provider || provider, error_type: data?.error_type }
         );
       }
 

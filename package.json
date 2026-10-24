@@ -1,0 +1,11 @@
+{
+  "name": "netsutra",
+  "version": "2.4.0",
+  "private": true,
+  "description": "NetSutra — Open-Source Autonomous Network Anomaly Detection and Investigation Platform",
+  "scripts": {
+    "dev": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "preview": "npm run preview --prefix client"
+  }
+}

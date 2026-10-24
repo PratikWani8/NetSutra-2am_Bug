@@ -10,6 +10,9 @@ export interface NetworkEvent {
   outbound_bytes?: number | null;
   inbound_bytes?: number | null;
   duration?: number | null;
+  packets?: number | null;
+  orig_pkts?: number | null;
+  resp_pkts?: number | null;
   conn_state?: string | null;
   history?: string | null;
   missed_bytes?: number | null;
@@ -42,6 +45,11 @@ export interface ZeekRawEvent {
   resp_ip_bytes?: number | string;
   received_bytes?: number | string;
   duration?: number | string;
+  packets?: number | string;
+  orig_pkts?: number | string;
+  resp_pkts?: number | string;
+  orig_packets?: number | string;
+  resp_packets?: number | string;
   conn_state?: string;
   state?: string;
   history?: string;

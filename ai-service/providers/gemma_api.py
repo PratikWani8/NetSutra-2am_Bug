@@ -18,12 +18,28 @@ logger = logging.getLogger(__name__)
 
 
 class GemmaApiProvider(BaseGemmaProvider):
-    """Integrates with Gemma models hosted via Google Generative Language API."""
+    """Integrates with Gemma / Gemini models hosted via Google Generative Language API."""
 
     def __init__(self, settings: Settings):
-        self.api_key = settings.GEMMA_API_KEY or ""
-        self.model = settings.GEMMA_API_MODEL or "gemma-2-9b-it"
-        self.base_url = (settings.GEMMA_API_BASE_URL or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+        import os
+        self.api_key = (
+            settings.GEMMA_API_KEY
+            or os.environ.get("GEMINI_API_KEY", "")
+            or os.environ.get("GEMMA_API_KEY", "")
+            or ""
+        )
+        self.model = (
+            os.environ.get("GEMINI_API_MODEL")
+            or os.environ.get("GEMMA_API_MODEL")
+            or settings.GEMMA_API_MODEL
+            or "gemini-3.5-flash"
+        )
+
+        self.base_url = (
+            settings.GEMMA_API_BASE_URL
+            or os.environ.get("GEMINI_API_BASE_URL")
+            or "https://generativelanguage.googleapis.com/v1beta"
+        ).rstrip("/")
         self.timeout = settings.GEMMA_API_TIMEOUT_SECONDS
 
     @property
@@ -47,53 +63,103 @@ class GemmaApiProvider(BaseGemmaProvider):
                 provider=self.provider_id,
             )
 
-        # Standard Google Generative Language endpoint
-        url = f"{self.base_url}/models/{self.model}:generateContent"
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": self.api_key,
-        }
-        payload = {
-            "contents": [
-                {
-                    "role": "user",
-                    "parts": [{"text": prompt}],
-                }
-            ],
-            "generationConfig": {
-                "temperature": 0.2,
-                "maxOutputTokens": 2048,
-                "responseMimeType": "application/json",
-            },
-        }
+        models_to_try = [self.model]
+        for fallback_m in ("gemini-3.5-flash-lite", "gemini-3.5-flash"):
+            if fallback_m not in models_to_try:
+                models_to_try.append(fallback_m)
 
-        try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.post(url, json=payload, headers=headers)
-        except httpx.ConnectError as exc:
-            logger.error("Failed to connect to Gemma API endpoint.")
-            raise ProviderUnavailableError(
-                message=f"Network error connecting to Gemma API: {str(exc)}",
-                provider=self.provider_id,
-            ) from exc
-        except httpx.TimeoutException as exc:
-            logger.error("Timeout waiting for Gemma API response.")
-            raise ProviderUnavailableError(
-                message=f"Request to Gemma API timed out after {self.timeout}s.",
-                provider=self.provider_id,
-            ) from exc
-        except Exception as exc:
-            logger.error("Unexpected error contacting Gemma API: %s", str(exc))
-            raise ProviderUnavailableError(
-                message=f"Failed to communicate with Gemma API: {str(exc)}",
-                provider=self.provider_id,
-            ) from exc
+        last_error = None
 
-        if response.status_code != 200:
-            logger.error("Gemma API returned HTTP %s: %s", response.status_code, response.text[:200])
-            if response.status_code in (401, 403):
+        for current_model in models_to_try:
+            url = f"{self.base_url}/models/{current_model}:generateContent?key={self.api_key}"
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key,
+            }
+            payload = {
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": prompt}],
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 2048,
+                    "responseMimeType": "application/json",
+                },
+            }
+
+            try:
+                async with httpx.AsyncClient(timeout=self.timeout) as client:
+                    response = await client.post(url, json=payload, headers=headers)
+            except httpx.ConnectError as exc:
+                logger.error("Failed to connect to Gemma API endpoint.")
+                raise ProviderUnavailableError(
+                    message=f"Network error connecting to Gemma API: {str(exc)}",
+                    provider=self.provider_id,
+                ) from exc
+            except httpx.TimeoutException as exc:
+                logger.error("Timeout waiting for Gemma API response.")
+                raise ProviderUnavailableError(
+                    message=f"Request to Gemma API timed out after {self.timeout}s.",
+                    provider=self.provider_id,
+                ) from exc
+            except Exception as exc:
+                logger.error("Unexpected error contacting Gemma API: %s", str(exc))
+                raise ProviderUnavailableError(
+                    message=f"Failed to communicate with Gemma API: {str(exc)}",
+                    provider=self.provider_id,
+                ) from exc
+
+            if response.status_code == 200:
+                try:
+                    data = response.json()
+                    candidates = data.get("candidates", [])
+                    if not candidates:
+                        raise ProviderResponseError(
+                            message="Gemma API returned an empty candidate list.",
+                            provider=self.provider_id,
+                        )
+
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    text_parts = [p.get("text", "") for p in parts if "text" in p]
+                    combined = "\n".join(t for t in text_parts if t.strip())
+                    if combined:
+                        self.model = current_model
+                        return combined
+                except Exception as exc:
+                    logger.warning("Failed to parse candidate text for %s: %s", current_model, exc)
+            elif response.status_code in (404, 503):
+                logger.warning("Model %s returned HTTP %s. Attempting alternate model.", current_model, response.status_code)
+                err_detail = ""
+                try:
+                    err_detail = response.json().get("error", {}).get("message", "")
+                except Exception:
+                    pass
+                last_error = ProviderResponseError(
+                    message=f"Gemma API returned HTTP {response.status_code}: {err_detail}",
+                    provider=self.provider_id
+                )
+                continue
+            elif response.status_code in (401, 403):
+                err_detail = ""
+                try:
+                    err_detail = response.json().get("error", {}).get("message", "")
+                except Exception:
+                    pass
                 raise ProviderResponseError(
-                    message=f"Gemma API authentication failed (HTTP {response.status_code}). Verify GEMMA_API_KEY.",
+                    message=f"Gemma API authentication failed (HTTP {response.status_code}): {err_detail or 'Invalid API key'}. Verify GEMMA_API_KEY in ai-service/.env.",
+                    provider=self.provider_id,
+                )
+            elif response.status_code == 400:
+                err_detail = ""
+                try:
+                    err_detail = response.json().get("error", {}).get("message", "")
+                except Exception:
+                    pass
+                raise ProviderResponseError(
+                    message=f"Gemma API bad request (HTTP 400): {err_detail or 'Check model or API key'}.",
                     provider=self.provider_id,
                 )
             elif response.status_code == 429:
@@ -102,34 +168,18 @@ class GemmaApiProvider(BaseGemmaProvider):
                     provider=self.provider_id,
                 )
             else:
-                raise ProviderResponseError(
-                    message=f"Gemma API returned error HTTP {response.status_code}.",
+                last_error = ProviderResponseError(
+                    message=f"Gemma API returned error HTTP {response.status_code}: {response.text[:150]}.",
                     provider=self.provider_id,
                 )
 
-        try:
-            data = response.json()
-            candidates = data.get("candidates", [])
-            if not candidates:
-                raise ProviderResponseError(
-                    message="Gemma API returned an empty candidate list.",
-                    provider=self.provider_id,
-                )
+        if last_error:
+            raise last_error
 
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts or "text" not in parts[0]:
-                raise ProviderResponseError(
-                    message="Gemma API candidate content did not contain text parts.",
-                    provider=self.provider_id,
-                )
-
-            return parts[0]["text"]
-        except (ValueError, KeyError, IndexError) as exc:
-            logger.error("Failed to parse Gemma API response JSON.")
-            raise ProviderResponseError(
-                message="Malformed response structure received from Gemma API.",
-                provider=self.provider_id,
-            ) from exc
+        raise ProviderResponseError(
+            message="No response could be obtained from Gemma API models.",
+            provider=self.provider_id,
+        )
 
     async def check_status(self) -> SingleProviderStatus:
         """Verify API key configuration and test model endpoint."""
@@ -162,15 +212,27 @@ class GemmaApiProvider(BaseGemmaProvider):
                         message=f"Gemma API is available (model: {self.model}).",
                         latency_ms=latency,
                     )
-                else:
+                # Try fallback model if configured model returned 404
+                fallback_url = f"{self.base_url}/models/gemini-3.5-flash"
+                res_fb = await client.get(fallback_url, headers=headers)
+                if res_fb.status_code == 200:
+                    self.model = "gemini-3.5-flash"
                     return SingleProviderStatus(
                         configured=True,
-                        available=False,
+                        available=True,
                         model=self.model,
                         endpoint=self.base_url,
-                        message=f"Gemma API returned HTTP {res.status_code}.",
+                        message=f"Gemma API is available (model: {self.model}).",
                         latency_ms=latency,
                     )
+                return SingleProviderStatus(
+                    configured=True,
+                    available=False,
+                    model=self.model,
+                    endpoint=self.base_url,
+                    message=f"Gemma API returned HTTP {res.status_code}.",
+                    latency_ms=latency,
+                )
         except Exception as exc:
             return SingleProviderStatus(
                 configured=True,

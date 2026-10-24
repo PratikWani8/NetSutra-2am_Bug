@@ -6,6 +6,7 @@ import {
   DEMO_INCIDENTS,
   DEMO_AI_PROVIDERS,
 } from '../data/mockData';
+import { SAMPLE_ZEEK_LOGS } from '../data/sampleZeekLogs';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -36,6 +37,180 @@ const notifyStatus = (status) => {
 export const getBackendStatus = () => isBackendReachable;
 
 /**
+ * Normalizes an anomaly object to provide consistent camelCase and snake_case properties.
+ */
+export function normalizeAnomaly(a) {
+  if (!a || typeof a !== 'object') return a;
+  const id = a.id || a.anomaly_id || a._id;
+  const rawSrc = a.sourceIp || a.source_ip || a.features?.source_ip || a.features?.['id.orig_h'] || a.features?.src_ip || a.evidence?.[0]?.source_ip || a.evidence?.[0]?.['id.orig_h'];
+  const srcIp = rawSrc && rawSrc !== 'N/A' && rawSrc !== 'undefined' ? rawSrc : (a.source_ip && a.source_ip !== 'N/A' ? a.source_ip : 'N/A');
+  const srcPort = a.sourcePort ?? a.source_port ?? a.features?.source_port ?? a.features?.['id.orig_p'] ?? a.evidence?.[0]?.source_port ?? null;
+  const rawDst = a.destinationIp || a.destination_ip || a.features?.destination_ip || a.features?.['id.resp_h'] || a.features?.dest_ip || a.evidence?.[0]?.destination_ip || a.evidence?.[0]?.['id.resp_h'];
+  const dstIp = rawDst && rawDst !== 'N/A' && rawDst !== 'undefined' ? rawDst : (a.destination_ip && a.destination_ip !== 'N/A' ? a.destination_ip : 'N/A');
+  const dstPort = a.destinationPort ?? a.destination_port ?? a.features?.destination_port ?? a.features?.['id.resp_p'] ?? a.evidence?.[0]?.destination_port ?? null;
+  const vector = a.vector || a.method || (a.reasons && a.reasons[0]) || 'Network Anomaly';
+  const ruleId = a.ruleId || a.rule_id || a.method || 'anom-detector';
+  const status = a.investigationStatus || a.status || 'open';
+  const score = a.score !== undefined ? a.score : 0.5;
+  const severity = (a.severity || 'MEDIUM').toUpperCase();
+  const detectionMethod = a.detectionMethod || a.method || 'Isolation Forest / Behavioral Outlier Detection';
+  const timestamp = a.timestamp || new Date().toISOString();
+  const reasons = Array.isArray(a.reasons) ? a.reasons : (a.reasons ? [a.reasons] : []);
+
+  let measuredFeatures = Array.isArray(a.measuredFeatures) ? a.measuredFeatures : [];
+  if (measuredFeatures.length === 0 && a.features && typeof a.features === 'object') {
+    measuredFeatures = Object.entries(a.features).map(([key, val]) => ({
+      feature: key.replace(/_/g, ' ').toUpperCase(),
+      observed: String(val),
+      baseline: a.features?.baseline_outbound_bytes || a.features?.baseline_rate_per_sec || 'Standard Baseline',
+      deviation: a.features?.z_score ? `z: ${a.features.z_score}` : (a.features?.deviation_ratio ? `${a.features.deviation_ratio}x` : 'Flagged'),
+    }));
+  }
+
+  return {
+    ...a,
+    id,
+    anomaly_id: id,
+    sourceIp: srcIp,
+    source_ip: srcIp,
+    sourcePort: srcPort,
+    source_port: srcPort,
+    destinationIp: dstIp,
+    destination_ip: dstIp,
+    destinationPort: dstPort,
+    destination_port: dstPort,
+    vector,
+    ruleId,
+    rule_id: ruleId,
+    investigationStatus: status,
+    status,
+    score,
+    severity,
+    detectionMethod,
+    timestamp,
+    reasons,
+    measuredFeatures,
+  };
+}
+
+/**
+ * Normalizes an incident object to guarantee valid IDs and fields.
+ */
+export function normalizeIncident(inc) {
+  if (!inc || typeof inc !== 'object') return inc;
+  const id = inc.id || inc.incident_id || inc._id;
+  const title = inc.title || `Incident: ${inc.primary_source_ip || 'Security Alert'}`;
+  const severity = (inc.severity || 'MEDIUM').toUpperCase();
+  const status = inc.status || 'open';
+  const summary = inc.summary || (inc.correlation_reasons ? inc.correlation_reasons.join('; ') : 'Correlated network behavioral anomaly alert.');
+  const firstObserved = inc.firstObserved || inc.first_observed || inc.created_at || new Date().toISOString();
+  const lastObserved = inc.lastObserved || inc.last_observed || inc.updated_at || new Date().toISOString();
+  const affectedHosts = inc.affectedHosts || (inc.primary_source_ip ? [inc.primary_source_ip] : []);
+  const assignedAnalyst = inc.assignedAnalyst || 'SecOps AI Agent';
+  
+  let evidenceTimeline = Array.isArray(inc.evidenceTimeline) ? inc.evidenceTimeline : [];
+  if (evidenceTimeline.length === 0 && Array.isArray(inc.evidence)) {
+    evidenceTimeline = inc.evidence.map((e) => ({
+      timestamp: e.timestamp || firstObserved,
+      event: `${e.source_ip || ''}:${e.source_port || ''} -> ${e.destination_ip || ''}:${e.destination_port || ''} (${e.protocol || 'TCP'}) [${e.conn_state || 'FLOW'}]`,
+      source: e.source_ip || 'Host',
+    }));
+  }
+
+  return {
+    ...inc,
+    id,
+    incident_id: id,
+    title,
+    severity,
+    status,
+    summary,
+    firstObserved,
+    first_observed: firstObserved,
+    lastObserved,
+    last_observed: lastObserved,
+    affectedHosts,
+    assignedAnalyst,
+    evidenceTimeline,
+  };
+}
+
+/**
+ * Normalizes a network event object.
+ */
+export function normalizeEvent(evt) {
+  if (!evt || typeof evt !== 'object') return evt;
+  const unwrapped = evt.event && typeof evt.event === 'object' ? { ...evt.event, ...evt } : evt;
+
+  const id = unwrapped.id || unwrapped.event_id || unwrapped._id || unwrapped.uid;
+  const sourceIp = unwrapped.sourceIp || unwrapped.source_ip || unwrapped['id.orig_h'] || unwrapped.orig_h || unwrapped.src_ip || unwrapped.source || 'N/A';
+  const rawSourcePort = unwrapped.sourcePort ?? unwrapped.source_port ?? unwrapped['id.orig_p'] ?? unwrapped.orig_p ?? unwrapped.src_port ?? null;
+  const sourcePort = rawSourcePort !== null && rawSourcePort !== undefined && rawSourcePort !== '-' ? Number(rawSourcePort) : null;
+
+  const destinationIp = unwrapped.destinationIp || unwrapped.destination_ip || unwrapped['id.resp_h'] || unwrapped.resp_h || unwrapped.dest_ip || unwrapped.destination || 'N/A';
+  const rawDestPort = unwrapped.destinationPort ?? unwrapped.destination_port ?? unwrapped['id.resp_p'] ?? unwrapped.resp_p ?? unwrapped.dest_port ?? null;
+  const destinationPort = rawDestPort !== null && rawDestPort !== undefined && rawDestPort !== '-' ? Number(rawDestPort) : null;
+
+  const protocol = (unwrapped.protocol || unwrapped.proto || 'tcp').toUpperCase();
+  const connState = unwrapped.conn_state || unwrapped.state || null;
+
+  let durationMs = unwrapped.durationMs !== undefined
+    ? unwrapped.durationMs
+    : (unwrapped.duration !== null && unwrapped.duration !== undefined && unwrapped.duration !== '-'
+        ? Number(unwrapped.duration) * 1000
+        : null);
+
+  if (durationMs === null && (connState === 'REJ' || connState === 'S0')) {
+    durationMs = 0;
+  }
+
+  const rawBytesIn = unwrapped.bytesIn !== undefined ? unwrapped.bytesIn : (unwrapped.inbound_bytes !== undefined ? unwrapped.inbound_bytes : unwrapped.resp_bytes);
+  const bytesIn = rawBytesIn !== null && rawBytesIn !== undefined && rawBytesIn !== '-' ? Number(rawBytesIn) : null;
+
+  const rawBytesOut = unwrapped.bytesOut !== undefined ? unwrapped.bytesOut : (unwrapped.outbound_bytes !== undefined ? unwrapped.outbound_bytes : unwrapped.orig_bytes);
+  const bytesOut = rawBytesOut !== null && rawBytesOut !== undefined && rawBytesOut !== '-' ? Number(rawBytesOut) : null;
+
+  let packets = unwrapped.packets ?? unwrapped.total_packets ?? null;
+  if (packets === null && (unwrapped.orig_pkts !== undefined || unwrapped.resp_pkts !== undefined)) {
+    const origP = Number(unwrapped.orig_pkts) || 0;
+    const respP = Number(unwrapped.resp_pkts) || 0;
+    if (origP > 0 || respP > 0) packets = origP + respP;
+  }
+  if (packets === null && unwrapped.history && typeof unwrapped.history === 'string') {
+    packets = unwrapped.history.length;
+  }
+  if (packets === null && (connState === 'REJ' || connState === 'S0')) {
+    packets = 1;
+  }
+  if (packets === null && (bytesIn !== null || bytesOut !== null)) {
+    const totalBytes = (bytesIn || 0) + (bytesOut || 0);
+    if (totalBytes > 0) {
+      packets = Math.max(1, Math.ceil(totalBytes / 1460) + (connState === 'SF' ? 3 : 0));
+    }
+  }
+
+  return {
+    ...unwrapped,
+    id,
+    event_id: id,
+    sourceIp,
+    source_ip: sourceIp,
+    sourcePort,
+    source_port: sourcePort,
+    destinationIp,
+    destination_ip: destinationIp,
+    destinationPort,
+    destination_port: destinationPort,
+    protocol,
+    conn_state: connState,
+    durationMs,
+    bytesIn,
+    bytesOut,
+    packets,
+  };
+}
+
+/**
  * Handle API responses according to the specification:
  * { success: true, data: { ... } }
  * { success: false, error: { code, message } }
@@ -46,7 +221,13 @@ async function handleRequest(requestPromise, fallbackData = null, options = {}) 
     notifyStatus(true);
     if (response.data && response.data.success !== undefined) {
       if (response.data.success) {
-        return { success: true, data: response.data.data, isDemo: false };
+        const payload = response.data.data;
+        if (payload && typeof payload === 'object' && Array.isArray(payload.items)) {
+          if (!payload.events) payload.events = payload.items;
+          if (!payload.anomalies) payload.anomalies = payload.items;
+          if (!payload.incidents) payload.incidents = payload.items;
+        }
+        return { success: true, data: payload, isDemo: false };
       }
       return {
         success: false,
@@ -65,9 +246,15 @@ async function handleRequest(requestPromise, fallbackData = null, options = {}) 
 
     // If options allow demo fallback when backend is unreachable
     if (isNetworkError && fallbackData !== null) {
+      const data = typeof fallbackData === 'function' ? fallbackData() : fallbackData;
+      if (data && typeof data === 'object') {
+        if (data.anomalies && !data.items) data.items = data.anomalies;
+        if (data.events && !data.items) data.items = data.events;
+        if (data.incidents && !data.items) data.items = data.incidents;
+      }
       return {
         success: true,
-        data: typeof fallbackData === 'function' ? fallbackData() : fallbackData,
+        data,
         isDemo: true,
         backendOffline: true,
         error: {
@@ -103,7 +290,16 @@ export const netSutraApi = {
 
   // GET /api/dashboard/summary
   async getDashboardSummary() {
-    return handleRequest(apiClient.get('/api/dashboard/summary'), DEMO_SUMMARY);
+    const res = await handleRequest(apiClient.get('/api/dashboard/summary'), DEMO_SUMMARY);
+    if (res.success && res.data) {
+      if (Array.isArray(res.data.recentAnomalies)) {
+        res.data.recentAnomalies = res.data.recentAnomalies.map(normalizeAnomaly);
+      }
+      if (Array.isArray(res.data.criticalIncidentsList)) {
+        res.data.criticalIncidentsList = res.data.criticalIncidentsList.map(normalizeIncident);
+      }
+    }
+    return res;
   },
 
   // GET /api/events
@@ -120,7 +316,7 @@ export const netSutraApi = {
     const queryString = query.toString();
     const endpoint = `/api/events${queryString ? `?${queryString}` : ''}`;
 
-    return handleRequest(apiClient.get(endpoint), () => {
+    const res = await handleRequest(apiClient.get(endpoint), () => {
       let filtered = [...DEMO_EVENTS];
       if (params.search) {
         const q = params.search.toLowerCase();
@@ -136,11 +332,19 @@ export const netSutraApi = {
       }
       return {
         events: filtered,
+        items: filtered,
         total: filtered.length,
         page: params.page || 1,
         limit: params.limit || 10,
       };
     });
+
+    if (res.success && res.data) {
+      if (Array.isArray(res.data.items)) res.data.items = res.data.items.map(normalizeEvent);
+      if (Array.isArray(res.data.events)) res.data.events = res.data.events.map(normalizeEvent);
+      if (Array.isArray(res.data)) res.data = res.data.map(normalizeEvent);
+    }
+    return res;
   },
 
   // GET /api/anomalies
@@ -155,7 +359,7 @@ export const netSutraApi = {
     const queryString = query.toString();
     const endpoint = `/api/anomalies${queryString ? `?${queryString}` : ''}`;
 
-    return handleRequest(apiClient.get(endpoint), () => {
+    const res = await handleRequest(apiClient.get(endpoint), () => {
       let filtered = [...DEMO_ANOMALIES];
       if (params.severity && params.severity !== 'ALL') {
         filtered = filtered.filter((a) => a.severity === params.severity);
@@ -175,55 +379,66 @@ export const netSutraApi = {
       }
       return {
         anomalies: filtered,
+        items: filtered,
         total: filtered.length,
         page: params.page || 1,
         limit: params.limit || 10,
       };
     });
+
+    if (res.success && res.data) {
+      if (Array.isArray(res.data.items)) res.data.items = res.data.items.map(normalizeAnomaly);
+      if (Array.isArray(res.data.anomalies)) res.data.anomalies = res.data.anomalies.map(normalizeAnomaly);
+      if (Array.isArray(res.data)) res.data = res.data.map(normalizeAnomaly);
+    }
+    return res;
   },
 
   // GET /api/anomalies/:id
   async getAnomalyById(id) {
-    return handleRequest(
+    if (!id || id === 'undefined') {
+      return {
+        success: false,
+        error: { code: 'INVALID_ID', message: 'No anomaly ID provided.' },
+      };
+    }
+    const res = await handleRequest(
       apiClient.get(`/api/anomalies/${id}`),
       () => DEMO_ANOMALIES.find((a) => a.id === id) || DEMO_ANOMALIES[0]
     );
+    if (res.success && res.data) {
+      res.data = normalizeAnomaly(res.data);
+    }
+    return res;
   },
 
   // POST /api/anomalies/:id/investigate
-  async investigateAnomaly(id) {
+  async investigateAnomaly(id, provider = undefined) {
+    if (!id || id === 'undefined') {
+      return {
+        success: false,
+        error: { code: 'INVALID_ID', message: 'No anomaly ID provided for AI investigation.' },
+      };
+    }
+    const body = provider ? { provider } : {};
     return handleRequest(
-      apiClient.post(`/api/anomalies/${id}/investigate`),
-      () => {
-        const match = DEMO_ANOMALIES.find((a) => a.id === id) || DEMO_ANOMALIES[0];
-        return {
-          anomalyId: id,
-          provider: 'gemma-api',
-          generatedAt: new Date().toISOString(),
-          explanation: match.aiInvestigation || {
-            summary: `Automated baseline deviation analysis for ${match.vector} from source ${match.sourceIp}.`,
-            observedEvidence: [
-              `Detected packet frequency and metrics deviating from typical behavior.`,
-              `Triggered rule: ${match.ruleId}.`,
-              `Anomaly confidence score of ${match.score}.`,
-            ],
-            possibleExplanations: [
-              `Potential anomalous network tool or automated script activity.`,
-              `Burst transfer or internal sync misconfiguration.`,
-              `Network diagnostic test or port scan.`,
-            ],
-            recommendedChecks: [
-              `Correlate connection timestamp with host endpoint auth logs.`,
-              `Verify if source IP belongs to approved operational inventory.`,
-              `Check egress firewall blocks on destination port ${match.destinationPort || 'N/A'}.`,
-            ],
-            uncertaintiesAndLimitations: [
-              `Packet payload was sampled; application state cannot be fully reconstructed from headers alone.`,
-              `Statistical score reflects anomaly magnitude, not malicious intent.`,
-            ],
-          },
-        };
-      }
+      apiClient.post(`/api/anomalies/${id}/investigate`, body, { timeout: 120000 }),
+      null
+    );
+  },
+
+  // POST /api/incidents/:id/explain
+  async explainIncident(id, provider = undefined) {
+    if (!id || id === 'undefined') {
+      return {
+        success: false,
+        error: { code: 'INVALID_ID', message: 'No incident ID provided for AI investigation.' },
+      };
+    }
+    const body = provider ? { provider } : {};
+    return handleRequest(
+      apiClient.post(`/api/incidents/${id}/explain`, body, { timeout: 120000 }),
+      null
     );
   },
 
@@ -238,7 +453,7 @@ export const netSutraApi = {
     const queryString = query.toString();
     const endpoint = `/api/incidents${queryString ? `?${queryString}` : ''}`;
 
-    return handleRequest(apiClient.get(endpoint), () => {
+    const res = await handleRequest(apiClient.get(endpoint), () => {
       let filtered = [...DEMO_INCIDENTS];
       if (params.status && params.status !== 'ALL') {
         filtered = filtered.filter((i) => i.status === params.status);
@@ -248,21 +463,45 @@ export const netSutraApi = {
       }
       return {
         incidents: filtered,
+        items: filtered,
         total: filtered.length,
       };
     });
+
+    if (res.success && res.data) {
+      if (Array.isArray(res.data.items)) res.data.items = res.data.items.map(normalizeIncident);
+      if (Array.isArray(res.data.incidents)) res.data.incidents = res.data.incidents.map(normalizeIncident);
+      if (Array.isArray(res.data)) res.data = res.data.map(normalizeIncident);
+    }
+    return res;
   },
 
   // GET /api/incidents/:id
   async getIncidentById(id) {
-    return handleRequest(
+    if (!id || id === 'undefined') {
+      return {
+        success: false,
+        error: { code: 'INVALID_ID', message: 'No incident ID provided.' },
+      };
+    }
+    const res = await handleRequest(
       apiClient.get(`/api/incidents/${id}`),
       () => DEMO_INCIDENTS.find((i) => i.id === id) || DEMO_INCIDENTS[0]
     );
+    if (res.success && res.data) {
+      res.data = normalizeIncident(res.data);
+    }
+    return res;
   },
 
   // PATCH /api/incidents/:id/status
   async updateIncidentStatus(id, status) {
+    if (!id || id === 'undefined') {
+      return {
+        success: false,
+        error: { code: 'INVALID_ID', message: 'No incident ID provided.' },
+      };
+    }
     return handleRequest(
       apiClient.patch(`/api/incidents/${id}/status`, { status }),
       () => {
@@ -291,10 +530,70 @@ export const netSutraApi = {
 
   // GET /api/ai/providers/status
   async getAiProvidersStatus() {
-    return handleRequest(apiClient.get('/api/ai/providers/status'), {
+    const res = await handleRequest(apiClient.get('/api/ai/providers/status', { timeout: 15000 }), {
       providers: DEMO_AI_PROVIDERS,
       activeProvider: 'gemma-api',
     });
+    if (res.success && res.data) {
+      const raw = res.data.providers || res.data;
+      if (raw && !Array.isArray(raw) && typeof raw === 'object') {
+        res.data.providersList = Object.entries(raw).map(([id, info]) => {
+          const isAvail =
+            typeof info === 'object' && info !== null
+              ? (info.available !== undefined ? Boolean(info.available) : info.status === 'available')
+              : Boolean(info);
+          return {
+            id,
+            ...(typeof info === 'object' && info !== null ? info : {}),
+            available: isAvail,
+            status: isAvail ? 'available' : 'unavailable',
+          };
+        });
+      }
+    }
+    return res;
+  },
+
+  // POST /api/events/ingest (Replay sample Zeek attack logs)
+  async ingestSampleTelemetry() {
+    return handleRequest(apiClient.post('/api/events/ingest', SAMPLE_ZEEK_LOGS), () => ({
+      ingested_events: SAMPLE_ZEEK_LOGS.length,
+      anomalies_detected: 2,
+      incidents_created: 1,
+      isDemo: true,
+    }));
+  },
+
+  // POST /api/events/ingest (Upload file or raw log content)
+  async uploadZeekLogs(fileOrContent) {
+    if (fileOrContent instanceof File) {
+      try {
+        // Read text directly from File object (supports .log, .json, .txt, TSV)
+        const textContent = await fileOrContent.text();
+        return handleRequest(
+          apiClient.post('/api/events/ingest', textContent, {
+            headers: { 'Content-Type': 'text/plain' },
+          })
+        );
+      } catch {
+        // Fallback to FormData with auto-boundary (Content-Type: undefined)
+        const formData = new FormData();
+        formData.append('file', fileOrContent);
+        return handleRequest(
+          apiClient.post('/api/events/ingest', formData, {
+            headers: { 'Content-Type': undefined },
+          })
+        );
+      }
+    } else if (typeof fileOrContent === 'string') {
+      return handleRequest(
+        apiClient.post('/api/events/ingest', fileOrContent, {
+          headers: { 'Content-Type': 'text/plain' },
+        })
+      );
+    } else {
+      return handleRequest(apiClient.post('/api/events/ingest', fileOrContent));
+    }
   },
 };
 

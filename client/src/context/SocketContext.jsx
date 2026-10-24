@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import socketService from '../services/socket';
+import { normalizeEvent, normalizeAnomaly, normalizeIncident } from '../services/api';
 
 const SocketContext = createContext(null);
 
@@ -32,16 +33,25 @@ export const SocketProvider = ({ children }) => {
       setConnectionStatus(status);
     });
 
-    const unsubNetwork = socketService.on('network:event', (event) => {
-      setLiveEvents((prev) => [event, ...prev].slice(0, 50));
+    const unsubNetwork = socketService.on('network:event', (rawEvent) => {
+      const normalized = normalizeEvent(rawEvent);
+      if (normalized) {
+        setLiveEvents((prev) => [normalized, ...prev].slice(0, 50));
+      }
     });
 
-    const unsubAnomaly = socketService.on('anomaly:detected', (anomaly) => {
-      setLiveAnomalies((prev) => [anomaly, ...prev].slice(0, 30));
+    const unsubAnomaly = socketService.on('anomaly:detected', (rawAnomaly) => {
+      const normalized = normalizeAnomaly(rawAnomaly);
+      if (normalized) {
+        setLiveAnomalies((prev) => [normalized, ...prev].slice(0, 30));
+      }
     });
 
-    const unsubIncident = socketService.on('incident:updated', (incident) => {
-      setIncidentUpdates((prev) => [incident, ...prev].slice(0, 20));
+    const unsubIncident = socketService.on('incident:updated', (rawIncident) => {
+      const normalized = normalizeIncident(rawIncident);
+      if (normalized) {
+        setIncidentUpdates((prev) => [normalized, ...prev].slice(0, 20));
+      }
     });
 
     const unsubSensor = socketService.on('sensor:status', (sensor) => {

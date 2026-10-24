@@ -179,7 +179,7 @@ export function normalizeZeekEvent(raw: ZeekRawEvent): NetworkEvent | null {
 }
 
 /**
- * Parses raw text content containing Zeek logs (JSON array or newline-delimited JSON lines).
+ * Parses raw text content containing Zeek logs (TSV/ASCII, JSON array, or newline-delimited JSON lines).
  */
 export function parseZeekLogs(content: string): NetworkEvent[] {
   const trimmed = content.trim();
@@ -189,7 +189,60 @@ export function parseZeekLogs(content: string): NetworkEvent[] {
 
   const events: NetworkEvent[] = [];
 
-  // Check if JSON array
+  // 1. Check if standard Zeek TSV / ASCII log format (indicated by #fields header)
+  if (trimmed.includes('#fields')) {
+    const lines = trimmed.split(/\r?\n/);
+    let fieldNames: string[] = [];
+    let separator = '\t';
+
+    for (const line of lines) {
+      const lineTrimmed = line.trim();
+      if (!lineTrimmed) continue;
+
+      if (lineTrimmed.startsWith('#separator')) {
+        const parts = lineTrimmed.split(/\s+/);
+        if (parts.length > 1 && parts[1].includes('\\x09')) {
+          separator = '\t';
+        } else if (parts.length > 1 && parts[1].includes('\\x20')) {
+          separator = ' ';
+        }
+        continue;
+      }
+
+      if (lineTrimmed.startsWith('#fields')) {
+        fieldNames = lineTrimmed.substring(7).trim().split(/\s+/);
+        continue;
+      }
+
+      if (lineTrimmed.startsWith('#')) {
+        continue;
+      }
+
+      if (fieldNames.length === 0) {
+        continue;
+      }
+
+      const values = lineTrimmed.split(separator === '\t' ? /\t/ : /\s+/);
+      const rawObj: Record<string, any> = {};
+      for (let i = 0; i < fieldNames.length && i < values.length; i++) {
+        const val = values[i];
+        if (val !== '-' && val !== '(empty)' && val !== undefined) {
+          rawObj[fieldNames[i]] = val;
+        }
+      }
+
+      const normalized = normalizeZeekEvent(rawObj);
+      if (normalized) {
+        events.push(normalized);
+      }
+    }
+
+    if (events.length > 0) {
+      return events;
+    }
+  }
+
+  // 2. Check if JSON array
   if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
     try {
       const parsedArray = JSON.parse(trimmed);
@@ -207,7 +260,7 @@ export function parseZeekLogs(content: string): NetworkEvent[] {
     }
   }
 
-  // Parse line-by-line (NDJSON / JSONL format typical of Zeek json streaming)
+  // 3. Parse line-by-line (NDJSON / JSONL format typical of Zeek json streaming)
   const lines = trimmed.split(/\r?\n/);
   for (const line of lines) {
     const lineTrimmed = line.trim();

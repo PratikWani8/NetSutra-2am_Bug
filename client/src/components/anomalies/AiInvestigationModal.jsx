@@ -1,13 +1,62 @@
-import React from 'react';
-import { X, Sparkles, AlertTriangle, CheckCircle2, HelpCircle, Shield, FileText } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  X,
+  Sparkles,
+  AlertTriangle,
+  CheckCircle2,
+  HelpCircle,
+  Shield,
+  FileText,
+  Server,
+  Cloud,
+  RefreshCw,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 import GlassCard from '../common/GlassCard';
 import SeverityBadge from '../common/SeverityBadge';
 import ScorePill from '../common/ScorePill';
 
-export const AiInvestigationModal = ({ isOpen, onClose, anomaly, investigationData, isLoading }) => {
+export const AiInvestigationModal = ({
+  isOpen,
+  onClose,
+  anomaly,
+  investigationData,
+  isLoading,
+  error,
+  activeProvider = 'gemma-api',
+  onSwitchProvider,
+  onRetry,
+}) => {
+  const [showTelemetryBaseline, setShowTelemetryBaseline] = useState(false);
+
   if (!isOpen) return null;
 
-  const explanation = investigationData?.explanation || anomaly?.aiInvestigation;
+  const rawExp =
+    investigationData?.explanation ||
+    (investigationData?.summary ? investigationData : null) ||
+    anomaly?.aiInvestigation;
+
+  const explanation = rawExp
+    ? {
+        summary: rawExp.summary || 'Statistical telemetry analysis completed.',
+        observedEvidence: rawExp.observedEvidence || rawExp.observed_evidence || [],
+        possibleExplanations: rawExp.possibleExplanations || rawExp.possible_explanations || [],
+        recommendedChecks: rawExp.recommendedChecks || rawExp.recommended_checks || [],
+        uncertaintiesAndLimitations: rawExp.uncertaintiesAndLimitations || rawExp.uncertainties || [],
+      }
+    : null;
+
+  const currentProviderId = investigationData?.provider || activeProvider || 'gemma-api';
+  const otherProviderId = currentProviderId === 'ollama' ? 'gemma-api' : 'ollama';
+
+  const errMessage = typeof error === 'string' ? error : error?.message || '';
+  const isOllamaError =
+    errMessage.toLowerCase().includes('ollama') ||
+    currentProviderId === 'ollama' ||
+    error?.code === 'OLLAMA_ERROR';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -24,11 +73,11 @@ export const AiInvestigationModal = ({ isOpen, onClose, anomaly, investigationDa
                   AI Root Cause Investigation
                 </h3>
                 <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                  {anomaly?.id || 'ANOMALY'}
+                  {anomaly?.id || anomaly?.anomaly_id || 'ANOMALY'}
                 </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Generated via {investigationData?.provider || 'Gemma 2'} · Non-binding statistical analysis
+                Target Provider: <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">{currentProviderId}</span> · Non-binding statistical analysis
               </p>
             </div>
           </div>
@@ -55,6 +104,107 @@ export const AiInvestigationModal = ({ isOpen, onClose, anomaly, investigationDa
               </p>
             </div>
           </div>
+
+          {/* Provider Specific Error with Manual Switching Action */}
+          {error && (
+            <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200 text-xs font-mono space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 font-bold text-rose-700 dark:text-rose-300">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>
+                    Provider Failure: {isOllamaError ? 'Ollama (Local LLM)' : 'Gemma API (Cloud)'} [{typeof error === 'string' ? 'PROVIDER_ERROR' : error.code || '502'}]
+                  </span>
+                </div>
+                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-rose-200/60 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200">
+                  No Auto-Fallback Applied
+                </span>
+              </div>
+
+              <p className="leading-relaxed text-slate-800 dark:text-slate-200">
+                {errMessage || 'The selected AI provider encountered a communication or configuration failure.'}
+              </p>
+
+              {/* Actionable Guidance per provider */}
+              <div className="p-2.5 rounded-lg bg-white/70 dark:bg-slate-900/70 text-[11px] text-slate-700 dark:text-slate-300 space-y-1">
+                <div className="font-bold text-slate-900 dark:text-white">Actionable Diagnostics:</div>
+                {isOllamaError ? (
+                  <p>
+                    • Ensure the local Ollama daemon is running: <code>ollama serve</code><br />
+                    • Verify the configured model is installed: <code>ollama pull gemma2</code><br />
+                    • Check connection to <code>http://localhost:11434</code>.
+                  </p>
+                ) : (
+                  <p>
+                    • Verify that <code>GEMMA_API_KEY</code> is configured in <code>ai-service/.env</code>.<br />
+                    • Check that your Google AI Studio API key has quota and valid permissions.<br />
+                    • If operating in an air-gapped environment, switch to local Ollama.
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons to Switch Provider or Retry */}
+              <div className="pt-2 flex flex-wrap items-center gap-2">
+                {onSwitchProvider && (
+                  <button
+                    onClick={() => onSwitchProvider(otherProviderId)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-colors cursor-pointer shadow-xs"
+                  >
+                    {otherProviderId === 'ollama' ? <Server className="w-3.5 h-3.5" /> : <Cloud className="w-3.5 h-3.5" />}
+                    <span>Switch to {otherProviderId === 'ollama' ? 'Local Ollama' : 'Gemma API (Cloud)'}</span>
+                  </button>
+                )}
+
+                {onRetry && (
+                  <button
+                    onClick={onRetry}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium text-xs transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Retry Provider</span>
+                  </button>
+                )}
+
+                <Link
+                  to="/settings/ai"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-200/50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 text-xs transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Configure Providers in Settings</span>
+                </Link>
+
+                <button
+                  onClick={() => setShowTelemetryBaseline(!showTelemetryBaseline)}
+                  className="ml-auto inline-flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  <span>{showTelemetryBaseline ? 'Hide' : 'View'} Grounded Telemetry Baseline</span>
+                  {showTelemetryBaseline ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              {/* Collapsible Telemetry Baseline view */}
+              {showTelemetryBaseline && (
+                <div className="mt-3 p-3 rounded-lg bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5">
+                  <div className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[10px]">
+                    Preserved Incident Telemetry & Evidence (Offline Safe)
+                  </div>
+                  <div><strong>Anomaly ID:</strong> {anomaly?.id || anomaly?.anomaly_id || 'N/A'}</div>
+                  <div><strong>Detection Method:</strong> {anomaly?.method || anomaly?.vector || 'Behavioral Analysis'}</div>
+                  <div><strong>Confidence Score:</strong> {anomaly?.score || 'N/A'} ({anomaly?.severity || 'MEDIUM'})</div>
+                  <div><strong>Endpoints:</strong> {anomaly?.source_ip || anomaly?.sourceIp || 'Source'} → {anomaly?.destination_ip || anomaly?.destinationIp || 'Destination'}</div>
+                  {anomaly?.reasons && anomaly.reasons.length > 0 && (
+                    <div>
+                      <strong>Reasons:</strong>
+                      <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                        {anomaly.reasons.map((r, i) => (
+                          <li key={i}>{r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {isLoading ? (
             <div className="py-16 text-center flex flex-col items-center justify-center space-y-3">

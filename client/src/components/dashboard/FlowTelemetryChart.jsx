@@ -106,17 +106,6 @@ export const FlowTelemetryChart = ({ data = DEMO_TELEMETRY }) => {
 
       {/* Chart Container */}
       <div className="h-64 w-full relative">
-        {/* Peak Annotation Badges */}
-        <div className="absolute top-2 left-1/4 z-10 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50/90 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-[10px] font-mono shadow-xs backdrop-blur-xs">
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
-          <span>04:20 Peak (184 Gbps)</span>
-        </div>
-
-        <div className="absolute top-12 left-[48%] z-10 hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50/90 dark:bg-amber-950/80 border border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-[10px] font-mono shadow-xs backdrop-blur-xs">
-          <ShieldAlert className="w-3 h-3 text-amber-600" />
-          <span>11:35 Exfil Spike</span>
-        </div>
-
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>

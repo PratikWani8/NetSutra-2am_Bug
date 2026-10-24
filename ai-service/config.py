@@ -15,14 +15,14 @@ class Settings(BaseSettings):
 
     # Gemma API provider settings
     GEMMA_API_KEY: str = ""
-    GEMMA_API_MODEL: str = "gemini-3.5-flash"
+    GEMMA_API_MODEL: str = "gemini-3.5-flash-lite"
     GEMMA_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
     GEMMA_API_TIMEOUT_SECONDS: float = 30.0
 
     # Ollama provider settings
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "gemma2"
-    OLLAMA_TIMEOUT_SECONDS: float = 45.0
+    OLLAMA_MODEL: str = "gemma4"
+    OLLAMA_TIMEOUT_SECONDS: float = 120.0
 
     # Detection & Correlation defaults
     MIN_BASELINE_EVENTS: int = 5

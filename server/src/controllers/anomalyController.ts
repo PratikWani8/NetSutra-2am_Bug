@@ -34,7 +34,8 @@ export async function getAnomalyById(req: Request, res: Response, next: NextFunc
 
 export async function investigateAnomaly(req: Request, res: Response, next: NextFunction) {
   try {
-    const investigation = await anomalyService.investigateAnomaly(req.params.id);
+    const requestedProvider = req.body?.provider;
+    const investigation = await anomalyService.investigateAnomaly(req.params.id, requestedProvider);
     return sendSuccess(res, investigation);
   } catch (error) {
     next(error);

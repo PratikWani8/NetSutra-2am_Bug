@@ -15,7 +15,7 @@ class Settings(BaseSettings):
 
     # Gemma API provider settings
     GEMMA_API_KEY: str = ""
-    GEMMA_API_MODEL: str = "gemma-2-9b-it"
+    GEMMA_API_MODEL: str = "gemini-3.5-flash"
     GEMMA_API_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta"
     GEMMA_API_TIMEOUT_SECONDS: float = 30.0
 

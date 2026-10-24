@@ -10,7 +10,12 @@ export class FileAndMongoSettingsRepository implements ISettingsRepository {
   private selectedProvider: SupportedProvider;
 
   constructor() {
-    this.configFilePath = path.resolve(process.cwd(), 'data', 'settings.json');
+    const possiblePaths = [
+      path.resolve(__dirname, '..', '..', 'data', 'settings.json'),
+      path.resolve(process.cwd(), 'server', 'data', 'settings.json'),
+      path.resolve(process.cwd(), 'data', 'settings.json')
+    ];
+    this.configFilePath = possiblePaths.find(p => fs.existsSync(p)) || possiblePaths[0];
     this.selectedProvider = (env.DEFAULT_AI_PROVIDER as SupportedProvider) || 'gemma-api';
     this.loadFromDisk();
   }

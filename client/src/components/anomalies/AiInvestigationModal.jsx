@@ -36,8 +36,7 @@ export const AiInvestigationModal = ({
 
   const rawExp =
     investigationData?.explanation ||
-    (investigationData?.summary ? investigationData : null) ||
-    anomaly?.aiInvestigation;
+    (investigationData?.summary ? investigationData : null);
 
   const explanation = rawExp
     ? {

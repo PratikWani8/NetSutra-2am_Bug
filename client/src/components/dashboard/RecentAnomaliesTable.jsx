@@ -12,12 +12,21 @@ export const RecentAnomaliesTable = ({ anomalies = [], onInvestigate }) => {
   const [page, setPage] = useState(1);
   const pageSize = 5;
 
-  let filtered = [...anomalies];
+  const safeAnomalies = Array.isArray(anomalies)
+    ? anomalies
+    : (anomalies?.items || anomalies?.anomalies || []);
+
+  let filtered = [...safeAnomalies];
   if (severityFilter !== 'ALL') {
-    filtered = filtered.filter((a) => a.severity === severityFilter);
+    filtered = filtered.filter(
+      (a) => (a.severity || '').toUpperCase() === severityFilter.toUpperCase()
+    );
   }
   if (statusFilter !== 'ALL') {
-    filtered = filtered.filter((a) => a.investigationStatus === statusFilter);
+    filtered = filtered.filter((a) => {
+      const status = (a.investigationStatus || a.status || '').toLowerCase();
+      return status === statusFilter.toLowerCase();
+    });
   }
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
@@ -94,27 +103,38 @@ export const RecentAnomaliesTable = ({ anomalies = [], onInvestigate }) => {
                 </td>
               </tr>
             ) : (
-              displayed.map((item) => (
+              displayed.map((item, idx) => {
+                const itemId = item.id || item.anomaly_id || `anom-${idx}`;
+                const rawSrc = item.sourceIp || item.source_ip || item.features?.source_ip || item.features?.['id.orig_h'] || item.features?.src_ip || item.evidence?.[0]?.source_ip || item.evidence?.[0]?.['id.orig_h'];
+                const srcIp = rawSrc && rawSrc !== 'N/A' && rawSrc !== 'undefined' ? rawSrc : (item.source_ip && item.source_ip !== 'N/A' ? item.source_ip : 'N/A');
+                const srcPort = item.sourcePort ?? item.source_port ?? item.features?.source_port ?? item.features?.['id.orig_p'] ?? item.evidence?.[0]?.source_port;
+                const rawDst = item.destinationIp || item.destination_ip || item.features?.destination_ip || item.features?.['id.resp_h'] || item.features?.dest_ip || item.evidence?.[0]?.destination_ip || item.evidence?.[0]?.['id.resp_h'];
+                const dstIp = rawDst && rawDst !== 'N/A' && rawDst !== 'undefined' ? rawDst : (item.destination_ip && item.destination_ip !== 'N/A' ? item.destination_ip : 'N/A');
+                const dstPort = item.destinationPort ?? item.destination_port ?? item.features?.destination_port ?? item.features?.['id.resp_p'] ?? item.evidence?.[0]?.destination_port;
+                const vector = item.vector || item.method || (item.reasons && item.reasons[0]) || 'Network Anomaly';
+                const rule = item.ruleId || item.rule_id || item.method;
+
+                return (
                 <tr
-                  key={item.id}
+                  key={itemId}
                   className="hover:bg-blue-50/40 dark:hover:bg-slate-800/40 transition-colors group"
                 >
                   <td className="py-2.5 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                     {formatUtcTime(item.timestamp)}
                   </td>
                   <td className="py-2.5 font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                    {formatIpPort(item.sourceIp, item.sourcePort)}
+                    {formatIpPort(srcIp, srcPort)}
                   </td>
                   <td className="py-2.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                    {formatIpPort(item.destinationIp, item.destinationPort)}
+                    {formatIpPort(dstIp, dstPort)}
                   </td>
                   <td className="py-2.5 max-w-xs truncate">
                     <div className="font-semibold text-slate-900 dark:text-white truncate">
-                      {item.vector}
+                      {vector}
                     </div>
-                    {item.ruleId && (
+                    {rule && (
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate">
-                        rule: {item.ruleId}
+                        rule: {rule}
                       </div>
                     )}
                   </td>
@@ -126,7 +146,7 @@ export const RecentAnomaliesTable = ({ anomalies = [], onInvestigate }) => {
                   </td>
                   <td className="py-2.5 text-right whitespace-nowrap">
                     <Link
-                      to={`/anomalies/${item.id}`}
+                      to={`/anomalies/${itemId}`}
                       className="inline-flex items-center gap-1 text-[11px] font-sans font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                     >
                       <span>Inspect</span>
@@ -134,7 +154,8 @@ export const RecentAnomaliesTable = ({ anomalies = [], onInvestigate }) => {
                     </Link>
                   </td>
                 </tr>
-              ))
+                  );
+                })
             )}
           </tbody>
         </table>

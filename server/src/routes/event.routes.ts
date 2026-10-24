@@ -12,5 +12,5 @@ const upload = multer({
 export const eventRouter = Router();
 
 eventRouter.get('/events', validate({ query: eventQuerySchema }), getEvents);
-eventRouter.post('/ingest/zeek', upload.single('file'), ingestZeek);
-eventRouter.post('/events/ingest', upload.single('file'), ingestZeek);
+eventRouter.post('/ingest/zeek', upload.any(), ingestZeek);
+eventRouter.post('/events/ingest', upload.any(), ingestZeek);

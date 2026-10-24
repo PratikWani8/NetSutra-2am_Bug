@@ -11,24 +11,25 @@ import {
   Clock,
   ArrowDown,
   ArrowUp,
+  UploadCloud,
 } from 'lucide-react';
 import Header from '../components/layout/Header';
 import GlassCard from '../components/common/GlassCard';
 import OfflineBanner from '../components/common/OfflineBanner';
 import LoadingSkeleton from '../components/common/LoadingSkeleton';
 import EmptyState from '../components/common/EmptyState';
-import netSutraApi from '../services/api';
+import netSutraApi, { normalizeEvent } from '../services/api';
+import IngestTelemetryModal from '../components/modals/IngestTelemetryModal';
 import { useSocket } from '../context/SocketContext';
-import { usePrototype, VIEW_STATES } from '../context/PrototypeContext';
 import {
   formatUtcTime,
   formatBytes,
   formatDuration,
   formatIpPort,
+  formatNumber,
 } from '../utils/formatters';
 
 export const EventsPage = () => {
-  const { viewState } = usePrototype();
   const { liveEvents, connectionStatus } = useSocket();
 
   const [events, setEvents] = useState([]);
@@ -42,6 +43,7 @@ export const EventsPage = () => {
   const [isLiveStreamActive, setIsLiveStreamActive] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const pageSize = 10;
+  const [isIngestOpen, setIsIngestOpen] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     setIsLoading(true);
@@ -55,9 +57,12 @@ export const EventsPage = () => {
     });
 
     if (res.success) {
-      const data = res.data?.events || res.data || [];
-      setEvents(data);
-      setTotal(res.data?.total ?? data.length);
+      const data =
+        res.data?.items ||
+        res.data?.events ||
+        (Array.isArray(res.data) ? res.data : []);
+      setEvents(Array.isArray(data) ? data : []);
+      setTotal(res.data?.total ?? (Array.isArray(data) ? data.length : 0));
       setIsDemo(!!res.isDemo);
     }
     setIsLoading(false);
@@ -69,12 +74,14 @@ export const EventsPage = () => {
 
   // Merge live socket events if streaming is active
   const displayedEvents = React.useMemo(() => {
+    const baseList = (Array.isArray(events) ? events : []).map(normalizeEvent);
     if (!isLiveStreamActive || !liveEvents || liveEvents.length === 0) {
-      return events;
+      return baseList;
     }
-    const existingIds = new Set(events.map((e) => e.id));
-    const newItems = liveEvents.filter((le) => !existingIds.has(le.id));
-    return [...newItems, ...events];
+    const existingIds = new Set(baseList.map((e) => e.id || e.event_id));
+    const liveList = (Array.isArray(liveEvents) ? liveEvents : []).map(normalizeEvent);
+    const newItems = liveList.filter((le) => !existingIds.has(le.id || le.event_id));
+    return [...newItems, ...baseList];
   }, [isLiveStreamActive, liveEvents, events]);
 
   const handleSort = (field) => {
@@ -86,21 +93,12 @@ export const EventsPage = () => {
     }
   };
 
-  if (viewState === VIEW_STATES.SKELETON) {
-    return (
-      <div className="space-y-6">
-        <Header title="Network Events Telemetry" subtitle="Raw event stream and packet inspect flow" />
-        <LoadingSkeleton type="table" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Header
         title="Network Events Telemetry"
-        badge="RAW-FLOW-V2"
         subtitle="Ingested network connection flows, protocol headers, and packet measurements"
+        onOpenIngest={() => setIsIngestOpen(true)}
         isDemo={isDemo}
       />
 
@@ -143,6 +141,16 @@ export const EventsPage = () => {
               <option value="HTTP">HTTP</option>
             </select>
 
+            {/* Ingest logs button */}
+            <button
+              onClick={() => setIsIngestOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all cursor-pointer shadow-xs"
+              title="Ingest Zeek Logs or Replay Telemetry"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              <span>Ingest Logs</span>
+            </button>
+
             {/* Live stream toggle */}
             <button
               onClick={() => setIsLiveStreamActive(!isLiveStreamActive)}
@@ -166,6 +174,8 @@ export const EventsPage = () => {
           </div>
         </div>
       </GlassCard>
+
+      
 
       {/* Events Data Table */}
       <GlassCard className="p-5">
@@ -217,7 +227,16 @@ export const EventsPage = () => {
               ) : displayedEvents.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400 font-mono">
-                    No network events match the specified query filters.
+                    <p className="mb-3 text-slate-500 dark:text-slate-400">
+                      No network events match the specified query filters or database is empty.
+                    </p>
+                    <button
+                      onClick={() => setIsIngestOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition shadow-sm cursor-pointer"
+                    >
+                      <UploadCloud className="w-4 h-4" />
+                      <span>Ingest / Replay Telemetry</span>
+                    </button>
                   </td>
                 </tr>
               ) : (
@@ -232,13 +251,13 @@ export const EventsPage = () => {
                       {formatUtcTime(e.timestamp)}
                     </td>
                     <td className="py-3 text-slate-500 dark:text-slate-400 font-bold whitespace-nowrap">
-                      {e.id || 'Unavailable'}
+                      {e.id || e.event_id || 'Unavailable'}
                     </td>
                     <td className="py-3 font-bold text-slate-900 dark:text-white whitespace-nowrap">
-                      {formatIpPort(e.sourceIp, e.sourcePort)}
+                      {formatIpPort(e.sourceIp || e.source_ip, e.sourcePort ?? e.source_port)}
                     </td>
                     <td className="py-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {formatIpPort(e.destinationIp, e.destinationPort)}
+                      {formatIpPort(e.destinationIp || e.destination_ip, e.destinationPort ?? e.destination_port)}
                     </td>
                     <td className="py-3 whitespace-nowrap">
                       <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[11px]">
@@ -246,19 +265,19 @@ export const EventsPage = () => {
                       </span>
                     </td>
                     <td className="py-3 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                      {formatDuration(e.durationMs)}
+                      {formatDuration(e.durationMs ?? (e.duration !== null && e.duration !== undefined ? Number(e.duration) * 1000 : null))}
                     </td>
                     <td className="py-3 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                      {e.bytesIn !== null && e.bytesIn !== undefined ? (
+                      {(e.bytesIn !== null && e.bytesIn !== undefined) || (e.bytesOut !== null && e.bytesOut !== undefined) ? (
                         <span>
-                          {formatBytes(e.bytesIn)} / {formatBytes(e.bytesOut)}
+                          {formatBytes(e.bytesIn ?? 0)} / {formatBytes(e.bytesOut ?? 0)}
                         </span>
                       ) : (
                         <span className="text-slate-400">Unavailable</span>
                       )}
                     </td>
                     <td className="py-3 text-right font-bold text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                      {e.packets !== null && e.packets !== undefined ? e.packets : 'Unavailable'}
+                      {e.packets !== null && e.packets !== undefined ? formatNumber(e.packets) : 'Unavailable'}
                     </td>
                   </tr>
                 ))
@@ -295,6 +314,12 @@ export const EventsPage = () => {
           </div>
         </div>
       </GlassCard>
+
+      <IngestTelemetryModal
+        isOpen={isIngestOpen}
+        onClose={() => setIsIngestOpen(false)}
+        onIngested={() => fetchEvents()}
+      />
     </div>
   );
 };

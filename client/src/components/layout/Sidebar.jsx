@@ -8,17 +8,12 @@ import {
   Bot,
   Settings,
   Shield,
-  Radio,
   UserCheck,
-  Server,
-  Zap,
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
-import { usePrototype, VIEW_STATES } from '../../context/PrototypeContext';
 
 export const Sidebar = () => {
-  const { connectionStatus, latency, sensorStatus, simulateLiveEvent } = useSocket();
-  const { viewState, setViewState } = usePrototype();
+  const { latency, sensorStatus } = useSocket();
 
   const navItems = [
     {
@@ -125,41 +120,6 @@ export const Sidebar = () => {
             );
           })}
         </nav>
-
-        {/* State Switcher (Prototype bar from screenshot for verifying all states) */}
-        <div className="pt-2 border-t border-slate-200/70 dark:border-slate-800/70 px-2 space-y-2">
-          <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider text-slate-400">
-            <span>STATE SWITCHER</span>
-            <span className="text-blue-600 dark:text-blue-400 font-bold">PROTOTYPE</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-1.5">
-            {Object.values(VIEW_STATES).map((state) => {
-              const isActive = viewState === state;
-              return (
-                <button
-                  key={state}
-                  onClick={() => setViewState(state)}
-                  className={`text-[10px] font-mono py-1 px-1.5 rounded-md border text-center transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-2xs'
-                      : 'bg-white/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50'
-                  }`}
-                >
-                  {state}
-                </button>
-              );
-            })}
-          </div>
-
-          <button
-            onClick={() => simulateLiveEvent('network:event')}
-            className="w-full mt-1 inline-flex items-center justify-center gap-1.5 text-[10px] font-mono py-1 px-2 rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
-          >
-            <Zap className="w-3 h-3 text-amber-500" />
-            <span>Emit Test Socket Event</span>
-          </button>
-        </div>
       </div>
 
       {/* Bottom Sensor Probe & User Section */}

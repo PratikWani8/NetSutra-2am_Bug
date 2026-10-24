@@ -1,11 +1,14 @@
 import { incidentRepository } from '../repositories/incidentRepository';
 import { anomalyRepository } from '../repositories/anomalyRepository';
 import { eventRepository } from '../repositories/eventRepository';
+import { settingsRepository } from '../repositories/settingsRepository';
+import { aiService } from './aiService';
 import { socketService } from './socketService';
 import { Incident, IncidentQueryFilter, IncidentStatus } from '../types/incidents';
 import { Anomaly } from '../types/anomalies';
 import { NetworkEvent } from '../types/events';
 import { PaginatedResult } from '../types/common';
+import { IncidentContext, InvestigateResponse, SupportedProvider } from '../types/investigation';
 import { AppError } from '../utils/response';
 import { logger } from '../utils/logger';
 
@@ -61,6 +64,55 @@ export class IncidentService {
     socketService.emitIncidentUpdated(updated);
 
     return updated;
+  }
+
+  async explainIncident(id: string, requestedProvider?: SupportedProvider): Promise<InvestigateResponse> {
+    const incident = await this.getIncidentById(id);
+    const provider = requestedProvider || (await settingsRepository.getSelectedProvider()) || 'gemma-api';
+
+    const formattedEvidence = (incident.events || []).map(evt => ({
+      event_id: evt.event_id,
+      timestamp: evt.timestamp,
+      source_ip: evt.source_ip,
+      destination_ip: evt.destination_ip,
+      source_port: evt.source_port,
+      destination_port: evt.destination_port,
+      protocol: evt.protocol,
+      service: evt.service,
+      outbound_bytes: evt.outbound_bytes,
+      inbound_bytes: evt.inbound_bytes,
+      duration: evt.duration,
+      conn_state: evt.conn_state
+    }));
+
+    const incidentContext: IncidentContext = {
+      incident_id: incident.incident_id,
+      anomaly_ids: incident.anomaly_ids || [],
+      evidence: formattedEvidence,
+      summary: incident.summary,
+      title: incident.title,
+      severity: incident.severity
+    };
+
+    socketService.emitAiStatus(provider, 'investigating', {
+      incident_id: incident.incident_id
+    });
+
+    try {
+      logger.info(`Dispatching incident explanation for ${id} using provider '${provider}'...`);
+      const result = await aiService.investigate(provider, incidentContext);
+      socketService.emitAiStatus(provider, 'completed', {
+        incident_id: incident.incident_id
+      });
+      return result;
+    } catch (err: any) {
+      logger.warn(`AI Provider incident explanation failed: ${err.message}`);
+      socketService.emitAiStatus(provider, 'error', {
+        incident_id: incident.incident_id,
+        error: err.message
+      });
+      throw err;
+    }
   }
 }
 

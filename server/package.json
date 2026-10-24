@@ -1,0 +1,49 @@
+{
+  "name": "netsutra-backend",
+  "version": "1.0.0",
+  "description": "NetSutra backend - network anomaly detection and investigation platform",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "jest --runInBand --detectOpenHandles --forceExit",
+    "test:coverage": "jest --coverage --runInBand --detectOpenHandles --forceExit",
+    "ingest": "tsx src/scripts/ingestCli.ts"
+  },
+  "keywords": [
+    "network-security",
+    "anomaly-detection",
+    "zeek",
+    "opensearch",
+    "ai-investigation"
+  ],
+  "author": "NetSutra Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@opensearch-project/opensearch": "^3.0.0",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mongoose": "^8.9.5",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.0.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.14",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.10.7",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "socket.io-client": "^4.8.1",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

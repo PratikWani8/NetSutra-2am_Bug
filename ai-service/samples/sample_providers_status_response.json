@@ -1,0 +1,21 @@
+{
+  "providers": {
+    "gemma-api": {
+      "configured": true,
+      "available": true,
+      "model": "gemma-2-9b-it",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta",
+      "message": "Gemma API is available (model: gemma-2-9b-it).",
+      "latency_ms": 142.5
+    },
+    "ollama": {
+      "configured": true,
+      "available": true,
+      "model": "gemma2",
+      "endpoint": "http://localhost:11434",
+      "message": "Ollama is running and model 'gemma2' is available.",
+      "latency_ms": 12.8
+    }
+  },
+  "timestamp": "2026-10-24T12:00:00Z"
+}

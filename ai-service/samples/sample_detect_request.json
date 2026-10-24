@@ -1,0 +1,78 @@
+{
+  "events": [
+    {
+      "event_id": "event-example-001",
+      "timestamp": "2026-10-24T12:00:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.20",
+      "source_port": 49152,
+      "destination_port": 443,
+      "protocol": "tcp",
+      "service": "ssl",
+      "outbound_bytes": 12000000,
+      "inbound_bytes": 450000,
+      "duration": 4.2,
+      "conn_state": "SF"
+    },
+    {
+      "event_id": "event-example-002",
+      "timestamp": "2026-10-24T12:01:30Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "203.0.113.88",
+      "source_port": 49153,
+      "destination_port": 8443,
+      "protocol": "tcp",
+      "outbound_bytes": 15000,
+      "inbound_bytes": 2200,
+      "duration": 0.8,
+      "conn_state": "SF"
+    }
+  ],
+  "baseline_events": [
+    {
+      "event_id": "base-001",
+      "timestamp": "2026-10-24T11:00:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.1",
+      "outbound_bytes": 2500000,
+      "conn_state": "SF"
+    },
+    {
+      "event_id": "base-002",
+      "timestamp": "2026-10-24T11:10:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.2",
+      "outbound_bytes": 2400000,
+      "conn_state": "SF"
+    },
+    {
+      "event_id": "base-003",
+      "timestamp": "2026-10-24T11:20:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.1",
+      "outbound_bytes": 2600000,
+      "conn_state": "SF"
+    },
+    {
+      "event_id": "base-004",
+      "timestamp": "2026-10-24T11:30:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.3",
+      "outbound_bytes": 2550000,
+      "conn_state": "SF"
+    },
+    {
+      "event_id": "base-005",
+      "timestamp": "2026-10-24T11:40:00Z",
+      "source_ip": "192.0.2.10",
+      "destination_ip": "198.51.100.1",
+      "outbound_bytes": 2450000,
+      "conn_state": "SF"
+    }
+  ],
+  "parameters": {
+    "volume_ratio_threshold": 3.0,
+    "volume_zscore_threshold": 3.0,
+    "min_score": 0.35
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "provider": "gemma-api",
+  "incident": {
+    "incident_id": "inc-example-001",
+    "anomaly_ids": [
+      "anom-example-001"
+    ],
+    "evidence": [
+      {
+        "event_id": "event-example-001",
+        "source_ip": "192.0.2.10",
+        "destination_ip": "198.51.100.20",
+        "outbound_bytes": 12000000
+      }
+    ],
+    "summary": "Unusual outbound traffic was detected."
+  }
+}

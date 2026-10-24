@@ -1,0 +1,39 @@
+{
+  "incidents": [
+    {
+      "incident_id": "inc-example-001",
+      "title": "HIGH: outbound_volume_deviation, rare_destination on 192.0.2.10",
+      "anomaly_ids": [
+        "anom-example-001",
+        "anom-example-002"
+      ],
+      "evidence_event_ids": [
+        "event-example-001",
+        "event-example-002"
+      ],
+      "correlation_reasons": [
+        "Shared source IP 192.0.2.10 within 90s window"
+      ],
+      "first_observed": "2026-10-24T12:00:00Z",
+      "last_observed": "2026-10-24T12:01:30Z",
+      "severity": "high",
+      "summary": "Cluster of 2 anomalies (outbound_volume_deviation, rare_destination) observed from source 192.0.2.10 between 12:00:00Z and 12:01:30Z.",
+      "primary_source_ip": "192.0.2.10",
+      "primary_destination_ip": "198.51.100.20",
+      "evidence": [
+        {
+          "event_id": "event-example-001",
+          "source_ip": "192.0.2.10",
+          "destination_ip": "198.51.100.20"
+        },
+        {
+          "event_id": "event-example-002",
+          "source_ip": "192.0.2.10",
+          "destination_ip": "203.0.113.88"
+        }
+      ]
+    }
+  ],
+  "total_anomalies_correlated": 2,
+  "incident_count": 1
+}

@@ -1,0 +1,48 @@
+{
+  "anomalies": [
+    {
+      "anomaly_id": "anom-example-001",
+      "timestamp": "2026-10-24T12:00:00Z",
+      "score": 0.87,
+      "severity": "high",
+      "method": "outbound_volume_deviation",
+      "reasons": [
+        "Outbound traffic volume exceeded the established baseline."
+      ],
+      "features": {
+        "outbound_bytes": 12000000,
+        "baseline_outbound_bytes": 2500000
+      },
+      "evidence_event_ids": [
+        "event-example-001"
+      ],
+      "baseline_confidence": "medium"
+    },
+    {
+      "anomaly_id": "anom-example-002",
+      "timestamp": "2026-10-24T12:01:30Z",
+      "score": 0.77,
+      "severity": "high",
+      "method": "rare_destination",
+      "reasons": [
+        "Source 192.0.2.10 established connection to destination 203.0.113.88, which has not been observed in baseline history.",
+        "Connection targeted unusual port 8443."
+      ],
+      "features": {
+        "source_ip": "192.0.2.10",
+        "destination_ip": "203.0.113.88",
+        "destination_port": 8443,
+        "historical_occurrences": 0,
+        "known_destinations_count": 3
+      },
+      "evidence_event_ids": [
+        "event-example-002"
+      ],
+      "baseline_confidence": "medium"
+    }
+  ],
+  "total_events_analyzed": 2,
+  "anomalies_detected": 2,
+  "baseline_events_used": 5,
+  "baseline_confidence": "medium"
+}

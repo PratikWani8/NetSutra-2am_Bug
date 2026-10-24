@@ -1,0 +1,20 @@
+{
+  "incident_id": "inc-example-001",
+  "provider": "gemma-api",
+  "model": "gemma-2-9b-it",
+  "summary": "A concise explanation of the observed behavior.",
+  "observed_evidence": [
+    "Outbound traffic exceeded the recorded baseline."
+  ],
+  "possible_explanations": [
+    "A legitimate transfer or an unusual data movement event."
+  ],
+  "recommended_checks": [
+    "Review the destination and related connections.",
+    "Compare the activity with the source's normal behavior."
+  ],
+  "uncertainties": [
+    "The available telemetry does not establish the purpose of the transfer."
+  ],
+  "created_at": "2026-10-24T12:05:00Z"
+}

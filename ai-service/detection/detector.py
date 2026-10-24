@@ -18,6 +18,7 @@ from detection.rules import (
     RareDestinationDetector,
 )
 
+from detection.multilog_rules import MultiLogBehaviorDetector
 
 class AnomalyDetectorService:
     """Service responsible for behavioral and statistical network anomaly detection."""
@@ -33,6 +34,7 @@ class AnomalyDetectorService:
             RareDestinationDetector(),
             ConnectionFrequencyBurstDetector(),
             FailedConnectionPatternDetector(),
+            MultiLogBehaviorDetector(),
         ]
 
     def detect(self, request: DetectionRequest) -> DetectionResponse:

@@ -43,13 +43,14 @@ export const formatFullUtc = (isoString) => {
 };
 
 export const formatIpPort = (ip, port) => {
-  if (!ip) return 'Unavailable';
+  if (!ip || ip === 'N/A' || ip === 'Unavailable') return 'Unavailable';
   if (port === null || port === undefined) return ip;
   return `${ip}:${port}`;
 };
 
 export const formatDuration = (ms) => {
   if (ms === null || ms === undefined) return 'Unavailable';
-  if (ms < 1000) return `${ms}ms`;
+  if (ms === 0) return '< 1ms';
+  if (ms < 1000) return `${Math.round(ms)}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 };

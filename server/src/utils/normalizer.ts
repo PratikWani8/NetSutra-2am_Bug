@@ -138,18 +138,35 @@ export function normalizeZeekEvent(raw: ZeekRawEvent): NetworkEvent | null {
   const rawHistory = raw.history;
   const history = rawHistory && rawHistory !== '-' ? String(rawHistory) : null;
 
-  // 12. Missed bytes
+  // 12. Packets
+  const rawOrigPkts = raw.orig_pkts ?? raw.orig_packets ?? (raw.metadata?.orig_pkts);
+  const origPkts = rawOrigPkts !== null && rawOrigPkts !== undefined && rawOrigPkts !== '-' ? Number(rawOrigPkts) : null;
+
+  const rawRespPkts = raw.resp_pkts ?? raw.resp_packets ?? (raw.metadata?.resp_pkts);
+  const respPkts = rawRespPkts !== null && rawRespPkts !== undefined && rawRespPkts !== '-' ? Number(rawRespPkts) : null;
+
+  const rawPackets = raw.packets ?? raw.total_packets ?? (raw.metadata?.packets);
+  let packets: number | null = rawPackets !== null && rawPackets !== undefined && rawPackets !== '-' ? Number(rawPackets) : null;
+
+  if (packets === null && (origPkts !== null || respPkts !== null)) {
+    packets = (origPkts ?? 0) + (respPkts ?? 0);
+  } else if (packets === null && history) {
+    packets = history.length;
+  }
+
+  // 13. Missed bytes
   const rawMissed = raw.missed_bytes;
   const missedBytes = rawMissed !== null && rawMissed !== undefined && rawMissed !== '-' ? Number(rawMissed) : null;
 
-  // 13. Metadata: keep any remaining non-standard keys
+  // 14. Metadata: keep any remaining non-standard keys
   const standardKeys = new Set([
     'event_id', 'timestamp', 'source_ip', 'destination_ip', 'source_port', 'destination_port',
     'protocol', 'service', 'outbound_bytes', 'inbound_bytes', 'duration', 'conn_state',
     'history', 'missed_bytes', 'id', 'id.orig_h', 'id.orig_p', 'id.resp_h', 'id.resp_p',
     'orig_h', 'orig_p', 'resp_h', 'resp_p', 'src_ip', 'dest_ip', 'src_port', 'dest_port',
     'ts', 'proto', 'orig_bytes', 'resp_bytes', 'orig_ip_bytes', 'resp_ip_bytes', 'sent_bytes',
-    'received_bytes', 'state', 'uid'
+    'received_bytes', 'state', 'uid', 'packets', 'orig_pkts', 'resp_pkts', 'orig_packets',
+    'resp_packets', 'total_packets'
   ]);
 
   const metadata: Record<string, any> = {};
@@ -171,6 +188,9 @@ export function normalizeZeekEvent(raw: ZeekRawEvent): NetworkEvent | null {
     outbound_bytes: isNaN(outboundBytes as number) ? null : outboundBytes,
     inbound_bytes: isNaN(inboundBytes as number) ? null : inboundBytes,
     duration: isNaN(duration as number) ? null : duration,
+    packets: isNaN(packets as number) ? null : packets,
+    orig_pkts: isNaN(origPkts as number) ? null : origPkts,
+    resp_pkts: isNaN(respPkts as number) ? null : respPkts,
     conn_state: connState,
     history,
     missed_bytes: isNaN(missedBytes as number) ? null : missedBytes,

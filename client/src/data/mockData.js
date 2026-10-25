@@ -97,30 +97,8 @@ export const DEMO_ANOMALIES = [
     ],
     supportingEventIds: ["EVT-904128", "EVT-904135", "EVT-904142", "EVT-904160"],
     relatedIncidents: ["INC-402"],
-    investigationStatus: "investigating",
-    aiInvestigation: {
-      summary: "High volume of high-entropy DNS queries originating from an internal pod towards an external nameserver, strongly deviating from standard local DNS caching behavior.",
-      observedEvidence: [
-        "Consistent TXT and A-record requests with randomized 64-character labels.",
-        "Unusually elevated packet payload sizes up to 482 bytes over UDP port 53.",
-        "Target IP 198.51.100.4 not present in internal enterprise recursive resolver list."
-      ],
-      possibleExplanations: [
-        "Covert data exfiltration using DNS tunneling (e.g., Iodine or dnscat2 protocol patterns).",
-        "Misconfigured third-party software tracking agent or antivirus telemetry beacon.",
-        "Legitimate dynamic domain generation or CDN query bursts under extreme load."
-      ],
-      recommendedChecks: [
-        "Inspect host process tree on 10.244.18.91 matching port 53218.",
-        "Verify DNS resolver configuration on host and whether egress port 53 bypasses corporate resolver.",
-        "Sample and decode base64 payloads to verify whether corporate confidential tokens are present."
-      ],
-      uncertaintiesAndLimitations: [
-        "Payload was sampled over UDP; partial packet drops may omit initial handshake metadata.",
-        "TLS decryption was not active on endpoint to corroborate application layer intent.",
-        "AI model explanation is probabilistic and does not replace forensic disk or process verification."
-      ]
-    }
+    investigationStatus: "open",
+    aiInvestigation: null
   },
   {
     id: "ANOM-8920",

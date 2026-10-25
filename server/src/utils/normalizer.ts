@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { isIP } from 'node:net';
 import { v4 as uuidv4 } from 'uuid';
 import { NetworkEvent, ZeekRawEvent } from '../types/events';
 
@@ -13,6 +14,9 @@ export function generateStableEventId(raw: ZeekRawEvent, tsIso: string): string 
   }
   if (raw.uid && typeof raw.uid === 'string') {
     return raw.uid;
+  }
+  if (raw.fuid && typeof raw.fuid === 'string') {
+    return `file-${raw.fuid}`;
   }
   if (typeof raw.id === 'string' && raw.id) {
     return raw.id;
@@ -69,21 +73,38 @@ export function normalizeZeekEvent(raw: ZeekRawEvent): NetworkEvent | null {
     return null;
   }
 
+  // Use actual IP addresses only. In Zeek files.log, `source` is an analyzer
+  // name (e.g. HTTP), while tx_hosts/rx_hosts carry the endpoint addresses.
+  const firstValidIp = (...candidates: unknown[]): string | null => {
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && isIP(candidate.trim())) {
+        return candidate.trim();
+      }
+    }
+    return null;
+  };
+  const txHosts = Array.isArray(raw.tx_hosts) ? raw.tx_hosts : [];
+  const rxHosts = Array.isArray(raw.rx_hosts) ? raw.rx_hosts : [];
+
+  // Use actual IP addresses only. In Zeek files.log, `source` is an analyzer
+  // name (e.g. HTTP), while tx_hosts/rx_hosts carry the endpoint addresses.
+
+  // Use actual IP addresses only. In Zeek files.log, `source` is an analyzer
+  // name (e.g. HTTP), while tx_hosts/rx_hosts carry the endpoint addresses.
+
   // 1. Source IP
-  const sourceIp =
-    raw['id.orig_h'] ??
-    raw.orig_h ??
-    raw.src_ip ??
-    raw.source ??
-    (typeof raw.id === 'object' ? raw.id?.orig_h : null);
+  const sourceIp = firstValidIp(
+    raw['id.orig_h'], raw.orig_h, raw.src_ip,
+    typeof raw.id === 'object' ? raw.id?.orig_h : null,
+    raw.source, txHosts[0]
+  );
 
   // 2. Destination IP
-  const destinationIp =
-    raw['id.resp_h'] ??
-    raw.resp_h ??
-    raw.dest_ip ??
-    raw.destination ??
-    (typeof raw.id === 'object' ? raw.id?.resp_h : null);
+  const destinationIp = firstValidIp(
+    raw['id.resp_h'], raw.resp_h, raw.dest_ip,
+    typeof raw.id === 'object' ? raw.id?.resp_h : null,
+    raw.destination, rxHosts[0]
+  );
 
   // In Zeek conn.log, source and destination IP are required to define a network event
   if (!sourceIp || !destinationIp) {

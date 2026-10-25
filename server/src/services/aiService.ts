@@ -91,7 +91,7 @@ export class AiService {
       };
 
       const response = await this.client.post<InvestigateResponse>('/investigate', payload, {
-        timeout: 60000 // LLMs may take up to 60s
+        timeout: 120000 // LLMs may take up to 120s
       });
       return response.data;
     } catch (err: any) {

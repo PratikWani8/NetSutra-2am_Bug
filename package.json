@@ -6,6 +6,13 @@
   "scripts": {
     "dev": "npm run dev --prefix client",
     "build": "npm run build --prefix client",
-    "preview": "npm run preview --prefix client"
+    "preview": "npm run preview --prefix client",
+    "simulate": "node scripts/simulate_telemetry.js",
+    "simulate:stream": "node scripts/simulate_telemetry.js --pace 500",
+    "simulate:resilience": "node scripts/simulate_telemetry.js --test-resilience",
+    "detect": "python scripts/run_detector.py",
+    "test:unseen": "node scripts/test_unseen_telemetry.js",
+    "test:providers": "node scripts/test_provider_validation.js",
+    "ingest:cli": "npm run ingest --prefix server"
   }
 }

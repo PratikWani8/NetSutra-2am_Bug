@@ -74,11 +74,19 @@ class OutboundVolumeDeviationDetector(BaseRuleDetector):
                             score=round(score, 2),
                             severity=calculate_severity(score),
                             method="outbound_volume_deviation",
+                            source_ip=ev.source_ip,
+                            destination_ip=ev.destination_ip,
+                            source_port=ev.source_port,
+                            destination_port=ev.destination_port,
                             reasons=[
                                 f"High outbound volume ({bytes_val:,} bytes) observed without sufficient historical baseline.",
                                 "Baseline confidence is low due to limited observation history for this host."
                             ],
                             features={
+                                "source_ip": ev.source_ip,
+                                "destination_ip": ev.destination_ip,
+                                "source_port": ev.source_port,
+                                "destination_port": ev.destination_port,
                                 "outbound_bytes": bytes_val,
                                 "baseline_outbound_bytes": None,
                                 "baseline_confidence": "low",
@@ -110,10 +118,18 @@ class OutboundVolumeDeviationDetector(BaseRuleDetector):
                         score=round(score, 2),
                         severity=calculate_severity(score),
                         method="outbound_volume_deviation",
+                        source_ip=ev.source_ip,
+                        destination_ip=ev.destination_ip,
+                        source_port=ev.source_port,
+                        destination_port=ev.destination_port,
                         reasons=[
                             f"Outbound traffic volume ({bytes_val:,} bytes) exceeded the established baseline ({int(mean_bytes):,} bytes) by {ratio:.2f}x (z-score: {z_score:.2f})."
                         ],
                         features={
+                            "source_ip": ev.source_ip,
+                            "destination_ip": ev.destination_ip,
+                            "source_port": ev.source_port,
+                            "destination_port": ev.destination_port,
                             "outbound_bytes": bytes_val,
                             "baseline_outbound_bytes": int(mean_bytes),
                             "z_score": round(z_score, 2),
@@ -178,10 +194,15 @@ class RareDestinationDetector(BaseRuleDetector):
                         score=round(score, 2),
                         severity=calculate_severity(score),
                         method="rare_destination",
+                        source_ip=ev.source_ip,
+                        destination_ip=ev.destination_ip,
+                        source_port=ev.source_port,
+                        destination_port=ev.destination_port,
                         reasons=reasons,
                         features={
                             "source_ip": ev.source_ip,
                             "destination_ip": ev.destination_ip,
+                            "source_port": ev.source_port,
                             "destination_port": ev.destination_port,
                             "historical_occurrences": 0,
                             "known_destinations_count": len(src_baseline.destination_ips),
@@ -237,11 +258,19 @@ class ConnectionFrequencyBurstDetector(BaseRuleDetector):
                             score=score,
                             severity=calculate_severity(score),
                             method="connection_frequency_burst",
+                            source_ip=src,
+                            destination_ip=src_events[0].destination_ip if src_events else None,
+                            source_port=src_events[0].source_port if src_events else None,
+                            destination_port=src_events[0].destination_port if src_events else None,
                             reasons=[
                                 f"Rapid burst of {conn_count} connections observed within {window_duration:.1f} seconds ({current_rate:.2f} conn/sec).",
                                 "Baseline confidence is low due to limited observation history."
                             ],
                             features={
+                                "source_ip": src,
+                                "destination_ip": src_events[0].destination_ip if src_events else None,
+                                "source_port": src_events[0].source_port if src_events else None,
+                                "destination_port": src_events[0].destination_port if src_events else None,
                                 "connection_count": conn_count,
                                 "window_seconds": round(window_duration, 2),
                                 "rate_per_sec": round(current_rate, 3),
@@ -266,10 +295,18 @@ class ConnectionFrequencyBurstDetector(BaseRuleDetector):
                         score=round(score, 2),
                         severity=calculate_severity(score),
                         method="connection_frequency_burst",
+                        source_ip=src,
+                        destination_ip=src_events[0].destination_ip if src_events else None,
+                        source_port=src_events[0].source_port if src_events else None,
+                        destination_port=src_events[0].destination_port if src_events else None,
                         reasons=[
                             f"Connection frequency ({current_rate:.2f} conn/sec, {conn_count} connections in {window_duration:.1f}s) exceeded baseline rate ({baseline_rate:.2f} conn/sec) by {rate_ratio:.1f}x."
                         ],
                         features={
+                            "source_ip": src,
+                            "destination_ip": src_events[0].destination_ip if src_events else None,
+                            "source_port": src_events[0].source_port if src_events else None,
+                            "destination_port": src_events[0].destination_port if src_events else None,
                             "connection_count": conn_count,
                             "window_seconds": round(window_duration, 2),
                             "rate_per_sec": round(current_rate, 3),
@@ -322,6 +359,7 @@ class FailedConnectionPatternDetector(BaseRuleDetector):
                 baseline_conf = src_baseline.confidence if src_baseline else BaselineConfidence.LOW
 
                 score = min(0.92, 0.50 + (failure_ratio * 0.30) + min(0.12, (failed_count / 20.0)))
+                first_failed = failed_events[0] if failed_events else src_events[0]
                 anomalies.append(
                     Anomaly(
                         anomaly_id=f"anom-fail-{uuid.uuid4().hex[:10]}",
@@ -329,10 +367,18 @@ class FailedConnectionPatternDetector(BaseRuleDetector):
                         score=round(score, 2),
                         severity=calculate_severity(score),
                         method="failed_connection_pattern",
+                        source_ip=src,
+                        destination_ip=first_failed.destination_ip if first_failed else None,
+                        source_port=first_failed.source_port if first_failed else None,
+                        destination_port=first_failed.destination_port if first_failed else None,
                         reasons=[
                             f"Repeated connection failures ({failed_count}/{total_count}, {failure_ratio * 100:.1f}%) observed with states {observed_states}."
                         ],
                         features={
+                            "source_ip": src,
+                            "destination_ip": first_failed.destination_ip if first_failed else None,
+                            "source_port": first_failed.source_port if first_failed else None,
+                            "destination_port": first_failed.destination_port if first_failed else None,
                             "failed_connection_count": failed_count,
                             "total_connections": total_count,
                             "failure_ratio": round(failure_ratio, 2),

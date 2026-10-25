@@ -15,6 +15,8 @@ export interface IngestionResult {
   incidents_created: number;
   anomalies: Anomaly[];
   incidents: Incident[];
+  detection_status: 'completed' | 'failed' | 'not_run';
+  detection_error?: string;
 }
 
 export class IngestionService {
@@ -40,7 +42,8 @@ export class IngestionService {
         anomalies_detected: 0,
         incidents_created: 0,
         anomalies: [],
-        incidents: []
+        incidents: [],
+        detection_status: 'not_run'
       };
     }
 
@@ -87,6 +90,8 @@ export class IngestionService {
 
     let detectedAnomalies: Anomaly[] = [];
     let correlatedIncidents: Incident[] = [];
+    let detectionStatus: 'completed' | 'failed' | 'not_run' = options.skipDetection ? 'not_run' : 'completed';
+    let detectionError: string | undefined;
 
     // 3. Trigger behavioral anomaly detection via AI Service (if not skipped)
     if (!options.skipDetection && events.length > 0) {
@@ -158,7 +163,9 @@ export class IngestionService {
           }
         }
       } catch (detErr: any) {
-        logger.warn(`Detection service call failed during ingestion: ${detErr.message}`);
+        detectionStatus = 'failed';
+        detectionError = 'Anomaly detection failed; telemetry was ingested but was not successfully evaluated.';
+        logger.error(`Detection service call failed during ingestion: ${detErr.message}`);
       }
     }
 
@@ -172,7 +179,9 @@ export class IngestionService {
       anomalies_detected: detectedAnomalies.length,
       incidents_created: correlatedIncidents.length,
       anomalies: detectedAnomalies,
-      incidents: correlatedIncidents
+      incidents: correlatedIncidents,
+      detection_status: detectionStatus,
+      ...(detectionError ? { detection_error: detectionError } : {})
     };
   }
 }

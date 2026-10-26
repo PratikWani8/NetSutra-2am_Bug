@@ -9,6 +9,7 @@ import AnomalyDetailPage from './pages/AnomalyDetailPage';
 import IncidentsPage from './pages/IncidentsPage';
 import IncidentDetailPage from './pages/IncidentDetailPage';
 import AiSettingsPage from './pages/AiSettingsPage';
+import SecurityDevPanelPage from './pages/SecurityDevPanelPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { SocketProvider } from './context/SocketContext';
 import { PrototypeProvider } from './context/PrototypeContext';
@@ -65,6 +66,8 @@ function AppLayout() {
           <Route path="/incidents/:id" element={<IncidentDetailPage />} />
           <Route path="/ai-provider" element={<AiSettingsPage />} />
           <Route path="/settings" element={<AiSettingsPage />} />
+          <Route path="/security-dev" element={<SecurityDevPanelPage />} />
+          <Route path="/dev-panel" element={<SecurityDevPanelPage />} />
           <Route path="/404" element={<NotFoundPage />} />
           <Route path="*" element={<Navigate to="/404" replace />} />
         </Routes>

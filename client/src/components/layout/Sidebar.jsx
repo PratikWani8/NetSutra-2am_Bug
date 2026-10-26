@@ -9,6 +9,7 @@ import {
   Settings,
   Shield,
   UserCheck,
+  Terminal,
 } from 'lucide-react';
 import { useSocket } from '../../context/SocketContext';
 
@@ -55,6 +56,13 @@ export const Sidebar = () => {
       to: '/settings',
       label: 'Settings',
       icon: Settings,
+    },
+    {
+      to: '/security-dev',
+      label: 'Security Dev Panel',
+      icon: Terminal,
+      badge: 'GEMMA',
+      badgeColor: 'bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800',
     },
   ];
 
